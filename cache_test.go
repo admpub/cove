@@ -261,6 +261,59 @@ func TestCacheRange(t *testing.T) {
 	assert.Equal(t, exp, kvs)
 }
 
+func TestCacheIter(t *testing.T) {
+	cache, err := lcache.New(lcache.TempUri())
+	assert.NoError(t, err)
+	defer cache.DeleteStore()
+	defer cache.Close()
+
+	// Set some key-value pairs in the cache
+	pairs := []lcache.KV{
+		{"key1", []byte("value1")},
+		{"key2", []byte("value2")},
+		{"key3:and:more", []byte("value3")},
+		{"key4", []byte("value4")},
+		{"key6", []byte("value5")},
+		{"key7", []byte("value6")},
+	}
+
+	exp := []lcache.KV{
+		{"key2", []byte("value2")},
+		{"key3:and:more", []byte("value3")},
+		{"key4", []byte("value4")},
+	}
+
+	for _, pair := range pairs {
+		err = cache.Set(pair.Key, pair.Value)
+		assert.NoError(t, err)
+	}
+
+	var res []lcache.KV
+
+	for k, v := range cache.Iter("key2", "key4") {
+
+		res = append(res, lcache.KV{
+			Key:   k,
+			Value: v,
+		})
+	}
+
+	assert.Equal(t, exp, res)
+
+	var keys []string
+	for key := range cache.Keys("key2", "key5") {
+		keys = append(keys, key)
+	}
+	assert.Equal(t, []string{"key2", "key3:and:more", "key4"}, keys)
+
+	var vals []string
+	for val := range cache.Values("key2", "key5") {
+		vals = append(vals, string(val))
+	}
+	assert.Equal(t, []string{"value2", "value3", "value4"}, vals)
+
+}
+
 func TestNS(t *testing.T) {
 	c1, err := lcache.New(lcache.TempUri())
 	assert.NoError(t, err)

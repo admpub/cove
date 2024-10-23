@@ -6,6 +6,7 @@ import (
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/modfin/lcache/internal/lock"
+	"iter"
 	"os"
 	"path/filepath"
 	"strings"
@@ -369,6 +370,16 @@ func (c *Cache) Range(from string, to string) (kv []KV, err error) {
 	return getrange(c.db, from, to, c.tbl)
 }
 
+func (c *Cache) Iter(from string, to string) iter.Seq2[string, []byte] {
+	return iterRange(c.db, from, to, c.tbl)
+}
+func (c *Cache) Keys(from string, to string) iter.Seq[string] {
+	return iterKeys(c.db, from, to, c.tbl)
+}
+func (c *Cache) Values(from string, to string) iter.Seq[[]byte] {
+	return iterValues(c.db, from, to, c.tbl)
+}
+
 type query interface {
 	Query(query string, args ...any) (*sql.Rows, error)
 	QueryRow(query string, args ...interface{}) *sql.Row
@@ -392,6 +403,75 @@ func getrange(db query, from string, to string, tbl func() string) ([]KV, error)
 
 	}
 	return kv, nil
+}
+
+func iterRange(db query, from string, to string, tbl func() string) iter.Seq2[string, []byte] {
+	r, err := db.Query(fmt.Sprintf(`SELECT key, value FROM %s WHERE $1 <= key AND key <= $2`, tbl()), from, to)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "lcache: could not query in iter, %v", err)
+		return nil
+	}
+
+	return func(yield func(string, []byte) bool) {
+		defer r.Close()
+		for r.Next() {
+			var k, v string
+			err := r.Scan(&k, &v)
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "lcache: could not scan in iter, %v", err)
+				return
+			}
+			if !yield(k, []byte(v)) {
+				return
+			}
+		}
+	}
+}
+
+func iterKeys(db query, from string, to string, tbl func() string) iter.Seq[string] {
+	r, err := db.Query(fmt.Sprintf(`SELECT key FROM %s WHERE $1 <= key AND key <= $2`, tbl()), from, to)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "lcache: could not query in iter, %v", err)
+		return nil
+	}
+
+	return func(yield func(string) bool) {
+		defer r.Close()
+		for r.Next() {
+			var k string
+			err := r.Scan(&k)
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "lcache: could not scan in iter, %v", err)
+				return
+			}
+			if !yield(k) {
+				return
+			}
+		}
+	}
+}
+
+func iterValues(db query, from string, to string, tbl func() string) iter.Seq[[]byte] {
+	r, err := db.Query(fmt.Sprintf(`SELECT value FROM %s WHERE $1 <= key AND key <= $2`, tbl()), from, to)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "lcache: could not query in iter, %v", err)
+		return nil
+	}
+
+	return func(yield func([]byte) bool) {
+		defer r.Close()
+		for r.Next() {
+			var v string
+			err := r.Scan(&v)
+			if err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "lcache: could not scan in iter, %v", err)
+				return
+			}
+			if !yield([]byte(v)) {
+				return
+			}
+		}
+	}
 }
 
 func evictAll(r query, tbl func() string) (int, error) {
