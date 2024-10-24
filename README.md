@@ -1,5 +1,7 @@
 # Cove
 
+![goreportcard.com](https://goreportcard.com/badge/github.com/modfin/cove)
+
 `cove` is a caching library for Go that utilizes SQLite as the storage backend. It provides a simple and efficient way to cache key-value pairs with support for TTL (Time-To-Live), namespaces, batch operations, range scans and eviction callbacks.
 
 
