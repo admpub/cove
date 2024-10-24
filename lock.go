@@ -1,8 +1,8 @@
-package lock
+package lcache
 
 import "sync"
 
-type KeyedMutex struct {
+type keyedMutex struct {
 	mu    sync.Mutex
 	locks map[string]*lockEntry
 }
@@ -12,22 +12,22 @@ type lockEntry struct {
 	refCount int
 }
 
-func Keyed() *KeyedMutex {
-	sl := &KeyedMutex{
+func keyedMu() *keyedMutex {
+	sl := &keyedMutex{
 		locks: make(map[string]*lockEntry),
 	}
 
 	return sl
 }
 
-func (km *KeyedMutex) Locked(key string) bool {
+func (km *keyedMutex) Locked(key string) bool {
 	km.mu.Lock()
 	defer km.mu.Unlock()
 	le, exists := km.locks[key]
 	return exists && le.refCount > 0
 }
 
-func (km *KeyedMutex) TryLocked(key string) bool {
+func (km *keyedMutex) TryLocked(key string) bool {
 	km.mu.Lock()
 	defer km.mu.Unlock()
 	le, exists := km.locks[key]
@@ -43,7 +43,7 @@ func (km *KeyedMutex) TryLocked(key string) bool {
 	return true
 }
 
-func (km *KeyedMutex) Lock(key string) {
+func (km *keyedMutex) Lock(key string) {
 	km.mu.Lock()
 	le, exists := km.locks[key]
 	if !exists {
@@ -56,7 +56,7 @@ func (km *KeyedMutex) Lock(key string) {
 	le.mu.Lock()
 }
 
-func (km *KeyedMutex) Unlock(key string) {
+func (km *keyedMutex) Unlock(key string) {
 	km.mu.Lock()
 	defer km.mu.Unlock()
 

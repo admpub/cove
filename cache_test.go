@@ -1,10 +1,11 @@
 package lcache_test
 
 import (
-	"math/rand/v2"
+	"fmt"
+	"log/slog"
+	"sort"
 	"strconv"
 	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -14,17 +15,15 @@ import (
 )
 
 func TestNewCacheWithTempUri(t *testing.T) {
-	cache, err := lcache.New(lcache.TempUri())
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
 	assert.NotNil(t, cache)
-	defer cache.DeleteStore()
 	defer cache.Close()
 }
 
 func TestCacheSetAndGet(t *testing.T) {
-	cache, err := lcache.New(lcache.TempUri())
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
-	defer cache.DeleteStore()
 	defer cache.Close()
 
 	key := "test-key"
@@ -38,94 +37,91 @@ func TestCacheSetAndGet(t *testing.T) {
 	assert.Equal(t, value, retrievedValue)
 }
 
-func TestCacheGetOrSet(t *testing.T) {
-	cache, err := lcache.New(lcache.TempUri())
+func TestCacheSetAndGetSize(t *testing.T) {
+	do := func(size int) func(t *testing.T) {
+		return func(t *testing.T) {
+			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+			assert.NoError(t, err)
+			defer cache.Close()
+
+			key := "test-key"
+
+			value := make([]byte, size)
+			for i := 0; i < size; i++ {
+				value[i] = byte(i)
+			}
+
+			err = cache.Set(key, value)
+			assert.NoError(t, err)
+
+			retrievedValue, err := cache.Get(key)
+			assert.NoError(t, err)
+			assert.Equal(t, value, retrievedValue)
+
+		}
+	}
+
+	t.Run("__1_B", do(1))
+	t.Run("__1_kB", do(1_000))
+	t.Run("_10_kB", do(10_000))
+	t.Run("100_kB", do(100_000))
+	t.Run("__1_MB", do(1_000_000))
+	t.Run("_10_MB", do(10_000_000))
+	//t.Run("100_MB", do(100_000_000))
+	//t.Run("__1_GB", do(1_000_000_000-100)) // Maximum blob size in SQLite is 1_000_000_000 aka 1GB (probably need some bytes for metadata)
+
+}
+
+func TestCacheSetGetEmpty(t *testing.T) {
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
-	defer cache.DeleteStore()
+	defer cache.Close()
+
+	key := "test-key"
+	value := []byte{}
+
+	err = cache.Set(key, value)
+	assert.NoError(t, err)
+
+	retrievedValue, err := cache.Get(key)
+	assert.NoError(t, err)
+	assert.Equal(t, value, retrievedValue)
+}
+
+func TestCacheSetGetNil(t *testing.T) {
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	assert.NoError(t, err)
+	defer cache.Close()
+
+	key := "test-key"
+
+	err = cache.Set(key, nil)
+	assert.NoError(t, err)
+
+	exp := []byte{}
+	retrievedValue, err := cache.Get(key)
+	assert.NoError(t, err)
+	assert.Equal(t, exp, retrievedValue)
+}
+
+func TestCacheGetOrSet(t *testing.T) {
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	assert.NoError(t, err)
 	defer cache.Close()
 
 	key := "test-key"
 	value := []byte("test-value")
 
-	retrievedValue, err := cache.GetOrSet(key, func(k string) ([]byte, error) {
+	retrievedValue, err := cache.GetOr(key, func(k string) ([]byte, error) {
 		return value, nil
 	})
 	assert.NoError(t, err)
 	assert.Equal(t, value, retrievedValue)
 }
 
-func BenchmarkCacheSet(b *testing.B) {
-	cache, err := lcache.New(lcache.TempUri())
-	assert.NoError(b, err)
-	defer cache.DeleteStore()
-	defer cache.Close()
-
-	value := []byte("1")
-
-	var i int64
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			ii := atomic.AddInt64(&i, 1)
-			k := strconv.Itoa(int(ii))
-			err = cache.Set(k, value)
-			assert.NoError(b, err)
-		}
-	})
-}
-
-func BenchmarkCacheGet(b *testing.B) {
-	cache, err := lcache.New(lcache.TempUri())
-	assert.NoError(b, err)
-	defer cache.DeleteStore()
-	defer cache.Close()
-
-	key := "1"
-	value := []byte("1")
-	err = cache.Set(key, value)
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			_, err = cache.Get(key)
-			assert.NoError(b, err)
-		}
-
-	})
-}
-
-func BenchmarkCacheLargeGet(b *testing.B) {
-	cache, err := lcache.New(lcache.TempUri())
-	assert.NoError(b, err)
-	defer cache.DeleteStore()
-	defer cache.Close()
-
-	start := time.Now()
-	for i := 0; i < b.N; i++ {
-		key := strconv.Itoa(i)
-		value := []byte("1")
-		err = cache.Set(key, value)
-		assert.NoError(b, err)
-	}
-	elapsed := time.Since(start)
-
-	b.ResetTimer()
-	b.RunParallel(func(pb *testing.PB) {
-		for pb.Next() {
-			key := strconv.Itoa(int(rand.Float64() * float64(b.N)))
-			_, err = cache.Get(key)
-			assert.NoError(b, err)
-
-		}
-
-	})
-	b.ReportMetric(float64(elapsed.Nanoseconds())/float64(b.N), "insert-ns/op")
-
-}
-
 func TestCacheGetOrSetParallel(t *testing.T) {
-	cache, err := lcache.New(lcache.TempUri())
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
-	defer cache.DeleteStore()
 	defer cache.Close()
 
 	key := "test-key"
@@ -137,7 +133,7 @@ func TestCacheGetOrSetParallel(t *testing.T) {
 
 	do := func() {
 		<-start
-		retrievedValue, err := cache.GetOrSet(key, func(k string) ([]byte, error) {
+		retrievedValue, err := cache.GetOr(key, func(k string) ([]byte, error) {
 			return value, nil
 		})
 		assert.NoError(t, err)
@@ -155,9 +151,8 @@ func TestCacheGetOrSetParallel(t *testing.T) {
 }
 
 func TestCacheGetOrSetParallelMem(t *testing.T) {
-	cache, err := lcache.New(lcache.TempUri())
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
-	defer cache.DeleteStore()
 	defer cache.Close()
 
 	key := "test-key"
@@ -169,7 +164,7 @@ func TestCacheGetOrSetParallelMem(t *testing.T) {
 
 	do := func() {
 		<-start
-		retrievedValue, err := cache.GetOrSet(key, func(k string) ([]byte, error) {
+		retrievedValue, err := cache.GetOr(key, func(k string) ([]byte, error) {
 			return value, nil
 		})
 		assert.NoError(t, err)
@@ -187,9 +182,8 @@ func TestCacheGetOrSetParallelMem(t *testing.T) {
 }
 
 func TestCacheEvict(t *testing.T) {
-	cache, err := lcache.New(lcache.TempUri())
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
-	defer cache.DeleteStore()
 	defer cache.Close()
 
 	key := "test-key"
@@ -198,10 +192,9 @@ func TestCacheEvict(t *testing.T) {
 	err = cache.Set(key, value)
 	assert.NoError(t, err)
 
-	prevValue, found, err := cache.Evict(key)
+	prevValue, err := cache.Evict(key)
 	assert.NoError(t, err)
-	assert.True(t, found)
-	assert.Equal(t, value, prevValue)
+	assert.Equal(t, value, prevValue.V)
 
 	_, err = cache.Get(key)
 	assert.Error(t, err)
@@ -209,9 +202,8 @@ func TestCacheEvict(t *testing.T) {
 }
 
 func TestCacheSetTTL(t *testing.T) {
-	cache, err := lcache.New(lcache.TempUri())
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
-	defer cache.DeleteStore()
 	defer cache.Close()
 
 	key := "test-key"
@@ -228,10 +220,69 @@ func TestCacheSetTTL(t *testing.T) {
 	assert.Equal(t, lcache.NotFound, err)
 }
 
-func TestCacheRange(t *testing.T) {
-	cache, err := lcache.New(lcache.TempUri())
+func TestCache_Range(t *testing.T) {
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
-	defer cache.DeleteStore()
+	defer cache.Close()
+
+	// Set some values
+	err = cache.Set("key1", []byte("value1"))
+	assert.NoError(t, err)
+	err = cache.Set("key2", []byte("value2"))
+	assert.NoError(t, err)
+	err = cache.Set("key3", []byte("value3"))
+	assert.NoError(t, err)
+
+	// Test ItrRange
+	kv, err := cache.Range(lcache.RANGE_MIN, lcache.RANGE_MAX)
+	assert.NoError(t, err)
+	assert.Equal(t, 3, len(kv))
+	assert.Equal(t, "value1", string(kv[0].V))
+	assert.Equal(t, "value2", string(kv[1].V))
+	assert.Equal(t, "value3", string(kv[2].V))
+}
+
+func TestCache_Keys(t *testing.T) {
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	assert.NoError(t, err)
+	defer cache.Close()
+
+	// Set some values
+	err = cache.Set("key1", []byte("value1"))
+	assert.NoError(t, err)
+	err = cache.Set("key2", []byte("value2"))
+	assert.NoError(t, err)
+
+	// Test ItrKeys
+	keys, err := cache.Keys(lcache.RANGE_MIN, lcache.RANGE_MAX)
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(keys))
+	assert.Equal(t, "key1", keys[0])
+	assert.Equal(t, "key2", keys[1])
+}
+
+func TestCache_Values(t *testing.T) {
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	assert.NoError(t, err)
+	defer cache.Close()
+
+	// Set some values
+	err = cache.Set("key1", []byte("value1"))
+	assert.NoError(t, err)
+	err = cache.Set("key2", []byte("value2"))
+	assert.NoError(t, err)
+
+	// Test ItrValues
+	values, err := cache.Values("key1", "key2")
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(values))
+	assert.Equal(t, "value1", string(values[0]))
+	assert.Equal(t, "value2", string(values[1]))
+}
+
+func TestCacheRange(t *testing.T) {
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	assert.NoError(t, err)
 	defer cache.Close()
 
 	// Set some key-value pairs in the cache
@@ -251,20 +302,28 @@ func TestCacheRange(t *testing.T) {
 	}
 
 	for _, pair := range pairs {
-		err = cache.Set(pair.Key, pair.Value)
+		err = cache.Set(pair.K, pair.V)
 		assert.NoError(t, err)
 	}
 
-	// Test the Range function
+	// Test the ItrRange function
 	kvs, err := cache.Range("key2", "key4")
+
 	assert.NoError(t, err)
+
+	sort.Slice(kvs, func(i, j int) bool {
+		return kvs[i].K < kvs[j].K
+	})
+	sort.Slice(exp, func(i, j int) bool {
+		return exp[i].K < exp[j].K
+	})
+
 	assert.Equal(t, exp, kvs)
 }
 
 func TestCacheIter(t *testing.T) {
-	cache, err := lcache.New(lcache.TempUri())
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
-	defer cache.DeleteStore()
 	defer cache.Close()
 
 	// Set some key-value pairs in the cache
@@ -284,30 +343,29 @@ func TestCacheIter(t *testing.T) {
 	}
 
 	for _, pair := range pairs {
-		err = cache.Set(pair.Key, pair.Value)
+		err = cache.Set(pair.K, pair.V)
 		assert.NoError(t, err)
 	}
 
 	var res []lcache.KV
 
-	for k, v := range cache.Iter("key2", "key4") {
-
+	for k, v := range cache.ItrRange("key2", "key4") {
 		res = append(res, lcache.KV{
-			Key:   k,
-			Value: v,
+			K: k,
+			V: v,
 		})
 	}
 
 	assert.Equal(t, exp, res)
 
 	var keys []string
-	for key := range cache.Keys("key2", "key5") {
+	for key := range cache.ItrKeys("key2", "key5") {
 		keys = append(keys, key)
 	}
 	assert.Equal(t, []string{"key2", "key3:and:more", "key4"}, keys)
 
 	var vals []string
-	for val := range cache.Values("key2", "key5") {
+	for val := range cache.ItrValues("key2", "key5") {
 		vals = append(vals, string(val))
 	}
 	assert.Equal(t, []string{"value2", "value3", "value4"}, vals)
@@ -315,9 +373,8 @@ func TestCacheIter(t *testing.T) {
 }
 
 func TestNS(t *testing.T) {
-	c1, err := lcache.New(lcache.TempUri())
+	c1, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
-	defer c1.DeleteStore()
 	defer c1.Close()
 
 	c1.Set("key1", []byte("ns1"))
@@ -340,12 +397,478 @@ func TestNS(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("ns1"), v)
 
-	_, found, err := c11.Evict("key1")
+	_, err = c11.Evict("key1")
+	hit, err := lcache.Hit(err)
 	assert.NoError(t, err)
-	assert.True(t, found)
+	assert.True(t, hit)
 
-	_, found, err = c1.Evict("key1")
+	_, err = c1.Evict("key1")
+	hit, err = lcache.Hit(err)
 	assert.NoError(t, err)
-	assert.False(t, found)
+	assert.False(t, hit)
 
 }
+
+func TestCacheBatchSetSizes(t *testing.T) {
+
+	do := func(itre int) func(t *testing.T) {
+		return func(t *testing.T) {
+			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+			assert.NoError(t, err)
+			defer cache.Close()
+
+			var rows []lcache.KV
+			for i := 0; i < itre; i++ {
+				rows = append(rows, lcache.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))})
+			}
+
+			err = cache.BatchSet(rows)
+			assert.NoError(t, err)
+
+			for _, row := range rows {
+				retrievedValue, err := cache.Get(row.K)
+				assert.NoError(t, err)
+				assert.Equal(t, row.V, retrievedValue)
+			}
+		}
+	}
+
+	t.Run("10", do(10))
+	t.Run("11", do(11))
+	t.Run("100", do(100))
+	t.Run("101", do(101))
+
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3-1), do(lcache.MAX_PARAMS/3-1))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3), do(lcache.MAX_PARAMS/3))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3+1), do(lcache.MAX_PARAMS/3+1))
+
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS-1), do(lcache.MAX_PARAMS-1))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS), do(lcache.MAX_PARAMS))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS+1), do(lcache.MAX_PARAMS+1))
+
+	t.Run("1_013", do(1013))
+	t.Run("10_000", do(10000))
+	t.Run("10_007", do(10007))
+
+}
+
+func TestCacheBatchGetSizes(t *testing.T) {
+
+	do := func(itre int) func(t *testing.T) {
+		return func(t *testing.T) {
+			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+			assert.NoError(t, err)
+			defer cache.Close()
+
+			var keys []string
+			var rows []lcache.KV
+			for i := 0; i < itre; i++ {
+				kv := lcache.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
+				rows = append(rows, kv)
+				keys = append(keys, kv.K)
+				err = cache.Set(kv.K, kv.V)
+				assert.NoError(t, err)
+			}
+
+			res, err := cache.BatchGet(keys)
+			assert.NoError(t, err)
+
+			sort.Slice(res, func(i, j int) bool {
+				return res[i].K < res[j].K
+			})
+			sort.Slice(rows, func(i, j int) bool {
+				return rows[i].K < rows[j].K
+			})
+			//sort.Strings(keys)
+
+			assert.Equal(t, len(rows), len(res))
+			assert.Equal(t, len(rows), len(keys))
+
+			for i, row := range rows {
+				assert.NoError(t, err)
+				assert.Equal(t, string(row.K), string(res[i].K))
+				assert.Equal(t, string(row.V), string(res[i].V))
+			}
+		}
+	}
+
+	t.Run("10", do(10))
+	t.Run("11", do(11))
+	t.Run("100", do(100))
+	t.Run("101", do(101))
+
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3-1), do(lcache.MAX_PARAMS/3-1))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3), do(lcache.MAX_PARAMS/3))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3+1), do(lcache.MAX_PARAMS/3+1))
+
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS-1), do(lcache.MAX_PARAMS-1))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS), do(lcache.MAX_PARAMS))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS+1), do(lcache.MAX_PARAMS+1))
+
+	t.Run("1_013", do(1013))
+	t.Run("10_000", do(10000))
+	t.Run("10_007", do(10007))
+
+}
+
+func TestCacheBatchEvictSizes(t *testing.T) {
+
+	do := func(itre int) func(t *testing.T) {
+		return func(t *testing.T) {
+
+			var evicted []lcache.KV
+			var mu sync.Mutex
+			wgEvicted := sync.WaitGroup{}
+			wgEvicted.Add(itre)
+
+			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose(),
+				lcache.WithEvictCallback(func(k string, v []byte) {
+					mu.Lock()
+					defer mu.Unlock()
+					defer wgEvicted.Done()
+					evicted = append(evicted, lcache.KV{K: k, V: v})
+				}),
+			)
+			assert.NoError(t, err)
+			defer cache.Close()
+
+			var keys []string
+			var rows []lcache.KV
+			for i := 0; i < itre; i++ {
+				kv := lcache.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
+				rows = append(rows, kv)
+				keys = append(keys, kv.K)
+				err = cache.Set(kv.K, kv.V)
+				assert.NoError(t, err)
+			}
+
+			res, err := cache.BatchEvict(keys)
+			assert.NoError(t, err)
+
+			sort.Slice(res, func(i, j int) bool {
+				return res[i].K < res[j].K
+			})
+			sort.Slice(rows, func(i, j int) bool {
+				return rows[i].K < rows[j].K
+			})
+
+			assert.Equal(t, len(rows), len(res))
+			assert.Equal(t, len(rows), len(keys))
+
+			for i, row := range rows {
+				assert.Equal(t, string(row.K), string(res[i].K))
+				assert.Equal(t, string(row.V), string(res[i].V))
+
+				_, err = cache.Get(row.K)
+				assert.Error(t, err)
+				assert.Equal(t, lcache.NotFound, err)
+			}
+
+			wgEvicted.Wait()
+			sort.Slice(evicted, func(i, j int) bool {
+				return evicted[i].K < evicted[j].K
+			})
+			assert.Equal(t, rows, evicted)
+
+		}
+	}
+
+	t.Run("10", do(10))
+	t.Run("11", do(11))
+	t.Run("100", do(100))
+	t.Run("101", do(101))
+
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3-1), do(lcache.MAX_PARAMS/3-1))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3), do(lcache.MAX_PARAMS/3))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3+1), do(lcache.MAX_PARAMS/3+1))
+
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS-1), do(lcache.MAX_PARAMS-1))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS), do(lcache.MAX_PARAMS))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS+1), do(lcache.MAX_PARAMS+1))
+
+	t.Run("1_013", do(1013))
+	t.Run("10_000", do(10000))
+	t.Run("10_007", do(10007))
+
+}
+
+func TestCacheBatchSet(t *testing.T) {
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	assert.NoError(t, err)
+	defer cache.Close()
+
+	rows := []lcache.KV{
+		{K: "key1", V: []byte("value1")},
+		{K: "key2", V: []byte("value2")},
+		{K: "key3", V: []byte("value3")},
+	}
+
+	err = cache.BatchSet(rows)
+	assert.NoError(t, err)
+
+	for _, row := range rows {
+		retrievedValue, err := cache.Get(row.K)
+		assert.NoError(t, err)
+		assert.Equal(t, row.V, retrievedValue)
+	}
+}
+
+func TestCacheBatchGet(t *testing.T) {
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	assert.NoError(t, err)
+	defer cache.Close()
+
+	rows := []lcache.KV{
+		{K: "key1", V: []byte("value1")},
+		{K: "key2", V: []byte("value2")},
+		{K: "key3", V: []byte("value3")},
+	}
+
+	err = cache.BatchSet(rows)
+	assert.NoError(t, err)
+
+	keys := []string{"key1", "key2", "key3", "key4"}
+	retrievedRows, err := cache.BatchGet(keys)
+	assert.NoError(t, err)
+
+	sort.Slice(retrievedRows, func(i, j int) bool {
+		return retrievedRows[i].K < retrievedRows[j].K
+	})
+
+	assert.Equal(t, rows, retrievedRows)
+}
+
+func TestCacheVacuum(t *testing.T) {
+
+	do := func(itre int) func(t *testing.T) {
+		return func(t *testing.T) {
+
+			var evicted []lcache.KV
+			var mu sync.Mutex
+			wgEvicted := sync.WaitGroup{}
+			wgEvicted.Add(itre)
+
+			ttl := 500 * time.Millisecond
+
+			cache, err := lcache.New(
+				lcache.URITemp(),
+				lcache.DBRemoveOnClose(),
+				lcache.WithTTL(ttl),
+				lcache.WithLogger(slog.Default()),
+				lcache.WithVacuum(lcache.Vacuum(100*time.Millisecond, 1000)),
+				lcache.WithEvictCallback(func(k string, v []byte) {
+					mu.Lock()
+					defer mu.Unlock()
+					defer wgEvicted.Done()
+					evicted = append(evicted, lcache.KV{K: k, V: v})
+				}),
+			)
+			assert.NoError(t, err)
+			defer cache.Close()
+
+			var rows []lcache.KV
+			for i := 0; i < itre; i++ {
+				kv := lcache.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
+				rows = append(rows, kv)
+			}
+
+			const chunkSize = 100
+			for i := 0; i < len(rows); i += chunkSize {
+				end := i + chunkSize
+				if end > len(rows) {
+					end = len(rows)
+				}
+				err = cache.BatchSet(rows[i:end])
+				assert.NoError(t, err)
+			}
+
+			wgEvicted.Wait()
+			sort.Slice(evicted, func(i, j int) bool {
+				return evicted[i].K < evicted[j].K
+			})
+			sort.Slice(rows, func(i, j int) bool {
+				return rows[i].K < rows[j].K
+			})
+			assert.Equal(t, rows, evicted)
+		}
+	}
+
+	t.Run("10", do(10))
+	t.Run("1_000", do(1_000))
+	t.Run("100_000", do(100_000))
+	//t.Run("1_000_000", do(1_000_000))
+}
+
+//
+//func BenchmarkCacheSet(b *testing.B) {
+//	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+//	assert.NoError(b, err)
+//	defer cache.Close()
+//
+//	value := []byte("1")
+//
+//	var i int64
+//	b.ResetTimer()
+//	b.RunParallel(func(pb *testing.PB) {
+//		for pb.Next() {
+//			ii := atomic.AddInt64(&i, 1)
+//			k := strconv.Itoa(int(ii))
+//			err = cache.Set(k, value)
+//			assert.NoError(b, err)
+//		}
+//	})
+//}
+//
+//func BenchmarkCacheGet(b *testing.B) {
+//	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+//	assert.NoError(b, err)
+//	defer cache.Close()
+//
+//	key := "1"
+//	value := []byte("1")
+//	err = cache.Set(key, value)
+//	b.ResetTimer()
+//	b.RunParallel(func(pb *testing.PB) {
+//		for pb.Next() {
+//			_, err = cache.Get(key)
+//			assert.NoError(b, err)
+//		}
+//
+//	})
+//}
+//
+//func BenchmarkCacheLargeSetGet(bbb *testing.B) {
+//
+//	bench := func(op ...lcache.Op) func(*testing.B) {
+//		return func(b *testing.B) {
+//			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose(), op...)
+//			assert.NoError(b, err)
+//			defer cache.Close()
+//
+//			start := time.Now()
+//			for i := 0; i < b.N; i++ {
+//				key := strconv.Itoa(i)
+//				value := []byte(key)
+//				err = cache.Set(key, value)
+//				assert.NoError(b, err)
+//			}
+//			elapsed := time.Since(start)
+//
+//			b.ResetTimer()
+//			b.RunParallel(func(pb *testing.PB) {
+//				for pb.Next() {
+//					key := strconv.Itoa(int(rand.Float64() * float64(b.N)))
+//					_, err = cache.Get(key)
+//					assert.NoError(b, err)
+//
+//				}
+//
+//			})
+//			b.ReportMetric(float64(elapsed.Nanoseconds())/float64(b.N), "insert-namespace/op")
+//		}
+//	}
+//
+//	bbb.Run("default", bench(lcache.dbDefault()))
+//	bbb.Run("default/op_journal", bench(lcache.dbDefault(), lcache.DBJournalSize(lcache.OptimizedJournalSize)))
+//	bbb.Run("default/sync_off", bench(lcache.dbDefault(), lcache.DBSyncOff()))
+//	bbb.Run("default/sync_off/op_journal", bench(lcache.dbDefault(), lcache.DBSyncOff(), lcache.DBJournalSize(lcache.OptimizedJournalSize)))
+//
+//	//bbb.Run("optimized", bench(lcache.DBFullOptimize()))
+//	//bbb.Run("optimized sync off", bench(lcache.DBFullOptimize(), lcache.DBSyncOff()))
+//
+//}
+//
+//func BenchmarkCacheRealWorld(bbb *testing.B) {
+//
+//	bench := func(op ...lcache.Op) func(*testing.B) {
+//		return func(b *testing.B) {
+//			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose(), op...)
+//			assert.NoError(b, err)
+//			defer cache.Close()
+//
+//			done := make(chan struct{})
+//			wg := sync.WaitGroup{}
+//			wg2 := sync.WaitGroup{}
+//			mu := sync.Mutex{}
+//
+//			var avgInsert float64
+//			var avgInsertCount float64
+//
+//			var avgEvict float64
+//			var avgEvictCount float64
+//
+//			for i := 0; i < runtime.NumCPU()/2; i++ {
+//				wg.Add(1)
+//				wg2.Add(1)
+//				go func() {
+//					defer wg2.Done()
+//					wg.Done()
+//					wg.Wait()
+//					for i := 0; i < b.N; i++ {
+//
+//						select {
+//						case <-done:
+//							return
+//						default:
+//						}
+//
+//						key := strconv.Itoa(int(rand.Float64() * float64(b.N)))
+//						value := []byte("1")
+//						start := time.Now()
+//						err := cache.Set(key, value)
+//						elapsed := time.Since(start)
+//						assert.NoError(b, err)
+//
+//						mu.Lock()
+//
+//						avgInsert = (avgInsert*avgInsertCount + float64(elapsed.Nanoseconds())) / (avgInsertCount + 1)
+//						avgInsertCount++
+//
+//						mu.Unlock()
+//
+//						if i%100 == 0 {
+//
+//							start = time.Now()
+//							_, _, err := cache.Evict(key)
+//							elapsed = time.Since(start)
+//							mu.Lock()
+//							avgEvict = (avgEvict*avgEvictCount + float64(elapsed.Nanoseconds())) / (avgEvictCount + 1)
+//							avgEvictCount++
+//							mu.Unlock()
+//							assert.NoError(b, err)
+//						}
+//					}
+//
+//				}()
+//			}
+//			wg.Wait()
+//
+//			b.ResetTimer()
+//			b.RunParallel(func(pb *testing.PB) {
+//				for pb.Next() {
+//					key := strconv.Itoa(int(rand.Float64() * float64(b.N)))
+//					_, err := cache.Get(key)
+//					if errors.Is(lcache.NotFound, err) {
+//						continue
+//					}
+//					assert.NoError(b, err)
+//				}
+//			})
+//			close(done)
+//			wg2.Wait()
+//
+//			b.ReportMetric(avgInsert, "insert-namespace/op")
+//			b.ReportMetric(avgEvict, "evict-namespace/op")
+//		}
+//
+//	}
+//
+//	bbb.Run("default", bench(lcache.dbDefault()))
+//	bbb.Run("default/op_journal", bench(lcache.dbDefault(), lcache.DBJournalSize(lcache.OptimizedJournalSize)))
+//	bbb.Run("default/sync_off", bench(lcache.dbDefault(), lcache.DBSyncOff()))
+//	bbb.Run("default/sync_off/op_journal", bench(lcache.dbDefault(), lcache.DBSyncOff(), lcache.DBJournalSize(lcache.OptimizedJournalSize)))
+//
+//	//bbb.Run("optimized", bench(lcache.DBFullOptimize()))
+//	//bbb.Run("optimized sync off", bench(lcache.DBFullOptimize(), lcache.DBSyncOff()))
+//
+//}

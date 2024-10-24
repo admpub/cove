@@ -1,6 +1,9 @@
 package lcache_test
 
 import (
+	"fmt"
+	"sort"
+	"strconv"
 	"testing"
 	"time"
 
@@ -8,8 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TypedCache(t *testing.T) *lcache.Typed[string] {
-	cache, err := lcache.New(lcache.TempUri())
+func TypedCache(t *testing.T) *lcache.TypedCache[string] {
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
 	assert.NotNil(t, cache)
 	return lcache.Of[string](cache)
@@ -23,8 +26,8 @@ type Complex struct {
 	NilErr  error
 }
 
-func TypedComplexCache(t *testing.T) *lcache.Typed[Complex] {
-	cache, err := lcache.New(lcache.TempUri())
+func TypedComplexCache(t *testing.T) *lcache.TypedCache[Complex] {
+	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
 	assert.NoError(t, err)
 	assert.NotNil(t, cache)
 	return lcache.Of[Complex](cache)
@@ -32,7 +35,6 @@ func TypedComplexCache(t *testing.T) *lcache.Typed[Complex] {
 
 func TestGetTypedComplexCache(t *testing.T) {
 	cache := TypedComplexCache(t)
-	defer cache.Raw().DeleteStore()
 	defer cache.Raw().Close()
 
 	a := Complex{
@@ -40,7 +42,7 @@ func TestGetTypedComplexCache(t *testing.T) {
 		NilErr: nil,
 		Slice:  []int{1, 2, 3},
 		Ref: &Complex{
-			Name: "ref",
+			Name: "namespaces",
 		},
 		private: "private",
 	}
@@ -57,7 +59,6 @@ func TestGetTypedComplexCache(t *testing.T) {
 
 func TestGetTypedCacheValue(t *testing.T) {
 	typedCache := TypedCache(t)
-	defer typedCache.Raw().DeleteStore()
 	defer typedCache.Raw().Close()
 
 	key := "test-key"
@@ -73,7 +74,6 @@ func TestGetTypedCacheValue(t *testing.T) {
 
 func TestSetTypedCacheValue(t *testing.T) {
 	typedCache := TypedCache(t)
-	defer typedCache.Raw().DeleteStore()
 	defer typedCache.Raw().Close()
 
 	key := "test-key"
@@ -89,7 +89,6 @@ func TestSetTypedCacheValue(t *testing.T) {
 
 func TestSetTypedCacheValueWithTTL(t *testing.T) {
 	typedCache := TypedCache(t)
-	defer typedCache.Raw().DeleteStore()
 	defer typedCache.Raw().Close()
 
 	key := "test-key"
@@ -108,13 +107,12 @@ func TestSetTypedCacheValueWithTTL(t *testing.T) {
 
 func TestGetOrSetTypedCacheValue(t *testing.T) {
 	typedCache := TypedCache(t)
-	defer typedCache.Raw().DeleteStore()
 	defer typedCache.Raw().Close()
 
 	key := "test-key"
 	value := "test-value"
 
-	retrievedValue, err := typedCache.GetOrSet(key, func(key string) (string, error) {
+	retrievedValue, err := typedCache.GetOr(key, func(key string) (string, error) {
 		return value, nil
 	})
 	assert.NoError(t, err)
@@ -123,7 +121,6 @@ func TestGetOrSetTypedCacheValue(t *testing.T) {
 
 func TestEvictTypedCacheValue(t *testing.T) {
 	typedCache := TypedCache(t)
-	defer typedCache.Raw().DeleteStore()
 	defer typedCache.Raw().Close()
 
 	key := "test-key"
@@ -132,9 +129,9 @@ func TestEvictTypedCacheValue(t *testing.T) {
 	err := typedCache.Set(key, value)
 	assert.NoError(t, err)
 
-	evictedValue, err := typedCache.Evict(key)
+	evicted, err := typedCache.Evict(key)
 	assert.NoError(t, err)
-	assert.Equal(t, value, evictedValue)
+	assert.Equal(t, value, evicted.Value())
 
 	_, err = typedCache.Get(key)
 	assert.Error(t, err)
@@ -143,7 +140,6 @@ func TestEvictTypedCacheValue(t *testing.T) {
 
 func TestEvictAllTypedCacheValues(t *testing.T) {
 	typedCache := TypedCache(t)
-	defer typedCache.Raw().DeleteStore()
 	defer typedCache.Raw().Close()
 
 	key1 := "test-key1"
@@ -167,4 +163,217 @@ func TestEvictAllTypedCacheValues(t *testing.T) {
 	_, err = typedCache.Get(key2)
 	assert.Error(t, err)
 	assert.Equal(t, lcache.NotFound, err)
+}
+
+func TestBatchSetTypedCacheValues(t *testing.T) {
+	typedCache := TypedCache(t)
+	defer typedCache.Raw().Close()
+
+	ziped := []lcache.KVt[string]{
+		{K: "key1", V: "value1"},
+		{K: "key2", V: "value2"},
+	}
+
+	err := typedCache.BatchSet(ziped)
+	assert.NoError(t, err)
+
+	for _, z := range ziped {
+		retrievedValue, err := typedCache.Get(z.K)
+		assert.NoError(t, err)
+		assert.Equal(t, z.V, retrievedValue)
+	}
+}
+
+func TestBatchGetTypedCacheValues(t *testing.T) {
+	typedCache := TypedCache(t)
+	defer typedCache.Raw().Close()
+
+	ziped := []lcache.KVt[string]{
+		{K: "key1", V: "value1"},
+		{K: "key2", V: "value2"},
+	}
+
+	err := typedCache.BatchSet(ziped)
+	assert.NoError(t, err)
+
+	keys := []string{"key1", "key2"}
+	zipped, err := typedCache.BatchGet(keys)
+	assert.NoError(t, err)
+
+	sort.Slice(zipped, func(i, j int) bool {
+		return zipped[i].K < zipped[j].K
+	})
+
+	assert.Equal(t, ziped, zipped)
+}
+
+func TestCacheBatchEvictTypedSizes(t *testing.T) {
+
+	do := func(itre int) func(t *testing.T) {
+		return func(t *testing.T) {
+			cc, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+			assert.NoError(t, err)
+			defer cc.Close()
+
+			typed := lcache.Of[string](cc)
+
+			var keys []string
+			var rows []lcache.KVt[string]
+			for i := 0; i < itre; i++ {
+				k := strconv.Itoa(i)
+				v := fmt.Sprintf("value_%d", i)
+				rows = append(rows, lcache.KVt[string]{K: k, V: v})
+				keys = append(keys, k)
+				err = typed.Set(k, v)
+				assert.NoError(t, err)
+			}
+
+			res, err := typed.BatchEvict(keys)
+			assert.NoError(t, err)
+
+			sort.Slice(res, func(i, j int) bool {
+				return res[i].K < res[j].K
+			})
+			sort.Slice(rows, func(i, j int) bool {
+				return rows[i].K < rows[j].K
+			})
+
+			assert.Equal(t, len(rows), len(res))
+			assert.Equal(t, len(rows), len(keys))
+
+			for i, row := range rows {
+				assert.Equal(t, row.K, res[i].K)
+				assert.Equal(t, row.V, res[i].V)
+
+				_, err = typed.Get(row.K)
+				assert.Error(t, err)
+				assert.Equal(t, lcache.NotFound, err)
+			}
+
+		}
+	}
+
+	t.Run("10", do(10))
+	t.Run("11", do(11))
+	t.Run("100", do(100))
+	t.Run("101", do(101))
+
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS-1), do(lcache.MAX_PARAMS-1))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS), do(lcache.MAX_PARAMS))
+	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS+1), do(lcache.MAX_PARAMS+1))
+
+}
+
+func TestTypedCacheItrRange(t *testing.T) {
+	typedCache := TypedCache(t)
+	defer typedCache.Raw().Close()
+
+	ziped := []lcache.KVt[string]{
+		{K: "key1", V: "value1"},
+		{K: "key2", V: "value2"},
+		{K: "key3", V: "value3"},
+	}
+
+	err := typedCache.BatchSet(ziped)
+	assert.NoError(t, err)
+
+	var result []lcache.KVt[string]
+	typedCache.ItrRange("key1", "key3")(func(k string, v string) bool {
+		result = append(result, lcache.KVt[string]{K: k, V: v})
+		return true
+	})
+
+	sort.Slice(result, func(i, j int) bool {
+		return result[i].K < result[j].K
+	})
+
+	assert.Equal(t, ziped, result)
+}
+
+func TestTypedCacheItrKeys(t *testing.T) {
+	typedCache := TypedCache(t)
+	defer typedCache.Raw().Close()
+
+	ziped := []lcache.KVt[string]{
+		{K: "key1", V: "value1"},
+		{K: "key2", V: "value2"},
+		{K: "key3", V: "value3"},
+	}
+
+	err := typedCache.BatchSet(ziped)
+	assert.NoError(t, err)
+
+	var keys []string
+	typedCache.ItrKeys("key1", "key3")(func(k string) bool {
+		keys = append(keys, k)
+		return true
+	})
+
+	sort.Strings(keys)
+	expectedKeys := []string{"key1", "key2", "key3"}
+	assert.Equal(t, expectedKeys, keys)
+}
+
+func TestTypedCacheItrValues(t *testing.T) {
+	typedCache := TypedCache(t)
+	defer typedCache.Raw().Close()
+
+	ziped := []lcache.KVt[string]{
+		{K: "key1", V: "value1"},
+		{K: "key2", V: "value2"},
+		{K: "key3", V: "value3"},
+	}
+
+	err := typedCache.BatchSet(ziped)
+	assert.NoError(t, err)
+
+	var values []string
+	typedCache.ItrValues("key1", "key3")(func(v string) bool {
+		values = append(values, v)
+		return true
+	})
+
+	sort.Strings(values)
+	expectedValues := []string{"value1", "value2", "value3"}
+	assert.Equal(t, expectedValues, values)
+}
+
+func TestTypedCacheValues(t *testing.T) {
+	typedCache := TypedCache(t)
+	defer typedCache.Raw().Close()
+
+	ziped := []lcache.KVt[string]{
+		{K: "key1", V: "value1"},
+		{K: "key2", V: "value2"},
+		{K: "key3", V: "value3"},
+	}
+
+	err := typedCache.BatchSet(ziped)
+	assert.NoError(t, err)
+
+	values, err := typedCache.Values("key1", lcache.RANGE_MAX)
+	assert.NoError(t, err)
+	sort.Strings(values)
+	expectedValues := []string{"value1", "value2", "value3"}
+	assert.Equal(t, expectedValues, values)
+}
+
+func TestTypedCacheKeys(t *testing.T) {
+	typedCache := TypedCache(t)
+	defer typedCache.Raw().Close()
+
+	ziped := []lcache.KVt[string]{
+		{K: "key1", V: "value1"},
+		{K: "key2", V: "value2"},
+		{K: "key3", V: "value3"},
+	}
+
+	err := typedCache.BatchSet(ziped)
+	assert.NoError(t, err)
+
+	values, err := typedCache.Keys("key1", lcache.RANGE_MAX)
+	assert.NoError(t, err)
+	sort.Strings(values)
+	expectedValues := []string{"key1", "key2", "key3"}
+	assert.Equal(t, expectedValues, values)
 }

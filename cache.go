@@ -5,8 +5,8 @@ import (
 	"errors"
 	"fmt"
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/modfin/lcache/internal/lock"
 	"iter"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,23 +14,7 @@ import (
 	"time"
 )
 
-// https://phiresky.github.io/blog/2020/sqlite-performance-tuning/
-
-const NS_DEFAULT = "default"
-
-var NotFound = errors.New("not found")
-
 type Op func(*Cache) error
-
-func exec(db *sql.DB, qs ...string) error {
-	for _, q := range qs {
-		_, err := db.Exec(q)
-		if err != nil {
-			return fmt.Errorf("could not exec, %s, err, %w", q, err)
-		}
-	}
-	return nil
-}
 
 func dbPragma(pragma string) Op {
 	return func(c *Cache) error {
@@ -40,12 +24,25 @@ func dbPragma(pragma string) Op {
 	}
 }
 
-func WithVacuum(interval time.Duration) Op {
-	return func(cache *Cache) error {
-		cache.vacuumTimer = interval
+func WithLogger(log *slog.Logger) Op {
+	return func(c *Cache) error {
+		if log == nil {
+			log = slog.New(discardLogger{})
+		}
+		c.log = log
 		return nil
 	}
 }
+
+// WithVacuum sets the vacuum function to be called in a go routine
+func WithVacuum(vacuum func(cache *Cache)) Op {
+	return func(cache *Cache) error {
+		go vacuum(cache)
+		return nil
+	}
+}
+
+// WithTTL sets the default TTL for the cache
 func WithTTL(defaultTTL time.Duration) Op {
 	return func(c *Cache) error {
 		if defaultTTL > time.Duration(0) {
@@ -55,40 +52,48 @@ func WithTTL(defaultTTL time.Duration) Op {
 	}
 }
 
-func WithEvictCallback(cb func(key string, ns string)) Op {
+// WithEvictCallback sets the callback function to be called when a key is evicted
+func WithEvictCallback(cb func(key string, val []byte)) Op {
 	return func(c *Cache) error {
 		c.onEvict = cb
 		return nil
 	}
 }
 
-func DBDefault() Op {
+// DBRemoveOnClose is a helper function to remove the database files on close
+func DBRemoveOnClose() Op {
+	return func(cache *Cache) error {
+		*cache.removeOnClose = true
+		return nil
+	}
+}
+
+func dbDefault() Op {
 	return func(c *Cache) error {
 		return errors.Join(
 			dbPragma("journal_mode = WAL")(c),
 			dbPragma("synchronous = normal")(c),
+			dbPragma(`auto_vacuum = incremental`)(c),
+			dbPragma(`temp_store = memory`)(c),
+			dbPragma(`incremental_vacuum`)(c),
 		)
 	}
 }
 
+// DBSyncOff is a helper function to set synchronous = off
+// this is useful for write performance but effects read performance and durability
 func DBSyncOff() Op {
 	return func(c *Cache) error {
 		return dbPragma("synchronous = off")(c)
 	}
 }
 
-func DBFullOptimize() Op {
+// DBPragma is a helper function to set a pragma on the database
+// see https://www.sqlite.org/pragma.html
+// example: DBPragma("journal_size_limit = 6144000")
+func DBPragma(s string) Op {
 	return func(c *Cache) error {
-		return errors.Join(
-			dbPragma(`journal_mode = WAL`)(c),
-			dbPragma(`synchronous = normal`)(c),
-			dbPragma(`journal_size_limit = 6144000`)(c),
-			dbPragma(`temp_store = memory`)(c),
-			dbPragma(`mmap_size = 30000000000`)(c),
-			dbPragma(`page_size = 32768`)(c),
-			dbPragma(`auto_vacuum = incremental`)(c),
-			dbPragma(`incremental_vacuum`)(c),
-		)
+		return dbPragma(s)(c)
 	}
 }
 
@@ -96,84 +101,21 @@ type Cache struct {
 	//shards
 	uri string
 
-	ttl         time.Duration
-	vacuumTimer time.Duration
+	ttl time.Duration
 
-	onEvict func(key string, ns string)
+	onEvict func(key string, val []byte)
 
-	ns  string
-	ref map[string]*Cache
+	namespace  string
+	namespaces map[string]*Cache
 
 	mu    *sync.Mutex
-	muKey *lock.KeyedMutex
+	muKey *keyedMutex
 
-	db     *sql.DB
-	closed bool
-}
-
-func (c *Cache) NS(ns string, ops ...Op) (*Cache, error) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
-	if _, found := c.ref[ns]; found {
-		return c.ref[ns], nil
-	}
-
-	nc := &Cache{
-		uri:         c.uri,
-		ttl:         c.ttl,
-		vacuumTimer: c.vacuumTimer,
-		//onEvict:     nil,
-		ns:     ns,
-		ref:    c.ref,
-		mu:     c.mu,
-		muKey:  lock.Keyed(),
-		db:     c.db,
-		closed: c.closed,
-	}
-
-	nc.ref[nc.ns] = nc
-
-	err := schema(nc)
-	if err != nil {
-		return nil, fmt.Errorf("could not create schema for namespace, %w", err)
-	}
-
-	for _, op := range ops {
-		err = op(c)
-		if err != nil {
-			return nil, fmt.Errorf("could not exec op, %w", err)
-		}
-	}
-
-	return nc, nil
-}
-
-func TempUri() string {
-	d := fmt.Sprintf("%d-lcache", time.Now().Unix())
-	uri := filepath.Join(os.TempDir(), d, "lcache.db")
-	os.MkdirAll(filepath.Dir(uri), 0755)
-	return fmt.Sprintf("file:%s?tmp=true", uri)
-}
-
-func (c *Cache) tbl() string {
-	return "_cache_" + c.ns
-}
-
-func schema(c *Cache) error {
-	q := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-    			key TEXT primary key, 
-    			value BLOB,
-    			create_at INTEGER DEFAULT (strftime('%%s', 'now')),
-    			expire_at INTEGER,
-    			ttl INTEGER                
-		 );`, c.tbl())
-
-	return exec(c.db, q)
-}
-
-func optimize(c *Cache) error {
-	return exec(c.db, `pragma vacuum;`, `pragma optimize;`)
+	db            *sql.DB
+	closeOnce     *sync.Once
+	closed        chan struct{}
+	removeOnClose *bool
+	log           *slog.Logger
 }
 
 func New(uri string, op ...Op) (*Cache, error) {
@@ -188,18 +130,25 @@ func New(uri string, op ...Op) (*Cache, error) {
 	}
 
 	c := &Cache{
-		uri:         uri,
-		db:          db,
-		ns:          NS_DEFAULT,
-		ref:         make(map[string]*Cache),
-		ttl:         72 * time.Hour,
-		vacuumTimer: time.Minute,
-		mu:          &sync.Mutex{},
-		muKey:       lock.Keyed(),
-	}
-	c.ref[c.ns] = c
+		uri:        uri,
+		ttl:        NO_TTL,
+		onEvict:    nil,
+		namespace:  NS_DEFAULT,
+		namespaces: make(map[string]*Cache),
+		mu:         &sync.Mutex{},
+		muKey:      keyedMu(),
+		db:         db,
+		log:        slog.New(discardLogger{}),
 
-	ops := append([]Op{DBDefault()}, op...)
+		closeOnce:     &sync.Once{},
+		closed:        make(chan struct{}),
+		removeOnClose: new(bool),
+	}
+	*c.removeOnClose = false
+
+	c.namespaces[c.namespace] = c
+
+	ops := append([]Op{dbDefault()}, op...)
 	for _, op := range ops {
 		err := op(c)
 		if err != nil {
@@ -219,15 +168,92 @@ func New(uri string, op ...Op) (*Cache, error) {
 	return c, nil
 }
 
+// NS creates a new namespace, if the namespace already exists it will return the existing namespace.
+// onEvict must be set for every new namespace created.
+// NS will create a new table in the database for the namespace in order to isolate it, and the indexes.
+func (c *Cache) NS(ns string, ops ...Op) (*Cache, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	if _, found := c.namespaces[ns]; found {
+		return c.namespaces[ns], nil
+	}
+
+	nc := &Cache{
+		uri: c.uri,
+		ttl: c.ttl,
+		//onEvict:     nil,
+		namespace:  ns,
+		namespaces: c.namespaces,
+		mu:         c.mu,
+		muKey:      keyedMu(),
+		db:         c.db,
+		log:        c.log,
+
+		closeOnce:     c.closeOnce,
+		closed:        c.closed,
+		removeOnClose: c.removeOnClose,
+	}
+
+	nc.namespaces[nc.namespace] = nc
+
+	err := schema(nc)
+	if err != nil {
+		return nil, fmt.Errorf("could not create schema for namespace, %w", err)
+	}
+
+	for _, op := range ops {
+		err = op(c)
+		if err != nil {
+			return nil, fmt.Errorf("could not exec op, %w", err)
+		}
+	}
+
+	return nc, nil
+}
+
+func (c *Cache) tbl() string {
+	return "_cache_" + c.namespace
+}
+
+func optimize(c *Cache) error {
+	return exec(c.db, `pragma vacuum;`, `pragma optimize;`)
+}
+
+func schema(c *Cache) error {
+	q := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
+    			key TEXT primary key, 
+    			value BLOB,
+    			create_at INTEGER DEFAULT (strftime('%%s', 'now')),
+    			expire_at INTEGER,
+    			ttl INTEGER                
+		 );`, c.tbl())
+
+	return exec(c.db, q)
+}
+
+// Close closes the cache
 func (c *Cache) Close() error {
 	defer func() {
-		c.closed = true
+		if *c.removeOnClose {
+			_ = c.removeStore()
+		}
 	}()
+
+	defer func() {
+		c.closeOnce.Do(func() {
+			close(c.closed)
+		})
+	}()
+
 	return c.db.Close()
 }
 
-func (c *Cache) DeleteStore() error {
-	if !c.closed {
+func (c *Cache) removeStore() error {
+
+	select {
+	case <-c.closed:
+	default:
 		return fmt.Errorf("db is not closed")
 	}
 
@@ -254,61 +280,22 @@ func (c *Cache) DeleteStore() error {
 	return err
 }
 
-func (c *Cache) cleaner() {
-	timer := time.Tick(c.vacuumTimer)
-	for {
-		select {
-		case <-timer:
-		}
-
-		q := fmt.Sprintf(`DELETE FROM %s WHERE expire_at < strftime('%%s', 'now') RETURNING key;`, c.tbl())
-
-		rows, err := c.db.Query(q)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			_, _ = fmt.Fprintf(os.Stderr, "could not delete expired keys, %v", err)
-			continue
-		}
-
-		if c.onEvict != nil {
-			for rows.Next() {
-				var key string
-				err := rows.Scan(&key)
-				if err != nil {
-					_, _ = fmt.Fprintf(os.Stderr, "could not scan key, %v", err)
-					continue
-				}
-				go c.onEvict(key, c.ns)
-			}
-		}
-	}
-}
-
-func (c *Cache) tx(eval func(tx *sql.Tx) error) error {
-	tx, err := c.db.Begin()
-	if err != nil {
-		return fmt.Errorf("could not begin transaction, %w", err)
-	}
-	err = eval(tx)
-	if err != nil {
-		_ = tx.Rollback()
-		return fmt.Errorf("rolling back due to err; %w", err)
-	}
-	err = tx.Commit()
-	if errors.Is(err, sql.ErrTxDone) {
-		return nil
-	}
-	return err
-}
-
+// Get retrieves a value from the cache
 func (c *Cache) Get(key string) ([]byte, error) {
-	return get(c.db, key, c.tbl)
+	return get(c.db, key, c.tbl())
 }
 
-func (c *Cache) GetOrSet(key string, setter func(k string) ([]byte, error)) ([]byte, error) {
+// GetOr retrieves a value from the cache, if the key does not exist it will call the setter function and set the result.
+// If multiple goroutines call GetOr with the same key, only one will call the fetch function
+// the others will wait for the first to finish and retrieve the cached value from the first call.
+// It is useful paradigm to lessen a thundering herd problem.
+// This is done by locking on the provided key in the application layer, not the database layer.
+// meaning, this might work poorly if multiple applications are using the same sqlite cache files.
+func (c *Cache) GetOr(key string, fetch func(k string) ([]byte, error)) ([]byte, error) {
 	var err error
 	var value []byte
 
-	value, err = get(c.db, key, c.tbl)
+	value, err = get(c.db, key, c.tbl())
 
 	if err == nil {
 		return value, nil
@@ -322,16 +309,16 @@ func (c *Cache) GetOrSet(key string, setter func(k string) ([]byte, error)) ([]b
 		c.muKey.Lock(key)
 		defer c.muKey.Unlock(key)
 
-		value, err = get(c.db, key, c.tbl) // if someone else has set the key
+		value, err = get(c.db, key, c.tbl()) // if someone else has set the key
 		if err == nil {
 			return value, nil
 		}
 
-		value, err = setter(key)
+		value, err = fetch(key)
 		if err != nil {
 			return nil, fmt.Errorf("could not set value, err; %w", err)
 		}
-		err = setTTL(c.db, key, value, c.ttl, c.tbl)
+		err = setTTL(c.db, key, value, c.ttl, c.tbl())
 		if err != nil {
 			return nil, fmt.Errorf("could not set ttl, err; %w", err)
 		}
@@ -341,205 +328,216 @@ func (c *Cache) GetOrSet(key string, setter func(k string) ([]byte, error)) ([]b
 	return value, nil
 }
 
+// Set sets a value in the cache, with default ttl
 func (c *Cache) Set(key string, value []byte) error {
 	return c.SetTTL(key, value, c.ttl)
 }
 
+// SetTTL sets a value in the cache with a custom ttl
 func (c *Cache) SetTTL(key string, value []byte, ttl time.Duration) error {
-
-	return setTTL(c.db, key, value, ttl, c.tbl)
+	return setTTL(c.db, key, value, ttl, c.tbl())
 }
 
-func (c *Cache) Evict(key string) (prev []byte, found bool, err error) {
-	prev, found, err = evict(c.db, key, c.tbl)
-	if err == nil && found && c.onEvict != nil {
-		go c.onEvict(key, c.ns)
-	}
-	return prev, found, err
-}
-func (c *Cache) EvictAll() (len int, err error) {
-	return evictAll(c.db, c.tbl)
-}
-
-type KV struct {
-	Key   string
-	Value []byte
-}
-
-func (c *Cache) Range(from string, to string) (kv []KV, err error) {
-	return getrange(c.db, from, to, c.tbl)
-}
-
-func (c *Cache) Iter(from string, to string) iter.Seq2[string, []byte] {
-	return iterRange(c.db, from, to, c.tbl)
-}
-func (c *Cache) Keys(from string, to string) iter.Seq[string] {
-	return iterKeys(c.db, from, to, c.tbl)
-}
-func (c *Cache) Values(from string, to string) iter.Seq[[]byte] {
-	return iterValues(c.db, from, to, c.tbl)
-}
-
-type query interface {
-	Query(query string, args ...any) (*sql.Rows, error)
-	QueryRow(query string, args ...interface{}) *sql.Row
-	Exec(query string, args ...any) (sql.Result, error)
-}
-
-func getrange(db query, from string, to string, tbl func() string) ([]KV, error) {
-	r, err := db.Query(fmt.Sprintf(`SELECT key, value FROM %s WHERE $1 <= key AND key <= $2`, tbl()), from, to)
+func (c *Cache) tx(eval func(tx *sql.Tx) error) error {
+	tx, err := c.db.Begin()
 	if err != nil {
-		return nil, fmt.Errorf("could not query, %w", err)
+		return fmt.Errorf("could not begin tx, err; %w", err)
 	}
-	defer r.Close()
-	var kv []KV
-	for r.Next() {
-		var k, v string
-		err := r.Scan(&k, &v)
-		if err != nil {
-			return nil, fmt.Errorf("could not scan, %w", err)
-		}
-		kv = append(kv, KV{k, []byte(v)})
-
-	}
-	return kv, nil
-}
-
-func iterRange(db query, from string, to string, tbl func() string) iter.Seq2[string, []byte] {
-	r, err := db.Query(fmt.Sprintf(`SELECT key, value FROM %s WHERE $1 <= key AND key <= $2`, tbl()), from, to)
+	err = eval(tx)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "lcache: could not query in iter, %v", err)
-		return nil
+		_ = tx.Rollback()
+		return fmt.Errorf("could not eval tx, err; %w", err)
 	}
-
-	return func(yield func(string, []byte) bool) {
-		defer r.Close()
-		for r.Next() {
-			var k, v string
-			err := r.Scan(&k, &v)
-			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "lcache: could not scan in iter, %v", err)
-				return
-			}
-			if !yield(k, []byte(v)) {
-				return
-			}
-		}
-	}
-}
-
-func iterKeys(db query, from string, to string, tbl func() string) iter.Seq[string] {
-	r, err := db.Query(fmt.Sprintf(`SELECT key FROM %s WHERE $1 <= key AND key <= $2`, tbl()), from, to)
+	err = tx.Commit()
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "lcache: could not query in iter, %v", err)
-		return nil
-	}
-
-	return func(yield func(string) bool) {
-		defer r.Close()
-		for r.Next() {
-			var k string
-			err := r.Scan(&k)
-			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "lcache: could not scan in iter, %v", err)
-				return
-			}
-			if !yield(k) {
-				return
-			}
-		}
-	}
-}
-
-func iterValues(db query, from string, to string, tbl func() string) iter.Seq[[]byte] {
-	r, err := db.Query(fmt.Sprintf(`SELECT value FROM %s WHERE $1 <= key AND key <= $2`, tbl()), from, to)
-	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "lcache: could not query in iter, %v", err)
-		return nil
-	}
-
-	return func(yield func([]byte) bool) {
-		defer r.Close()
-		for r.Next() {
-			var v string
-			err := r.Scan(&v)
-			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "lcache: could not scan in iter, %v", err)
-				return
-			}
-			if !yield([]byte(v)) {
-				return
-			}
-		}
-	}
-}
-
-func evictAll(r query, tbl func() string) (int, error) {
-	res, err := r.Exec(fmt.Sprintf(`
-		DELETE FROM %s 
-	`, tbl()))
-	if err != nil {
-		return 0, fmt.Errorf("could not delete all in %s, err; %w", tbl(), err)
-	}
-	i, err := res.RowsAffected()
-	return int(i), err
-}
-func evict(r query, key string, tbl func() string) ([]byte, bool, error) {
-	var value []byte
-	err := r.QueryRow(fmt.Sprintf(`
-		DELETE FROM %s 
-		WHERE key = $1
-		RETURNING value
-	`, tbl()), key).Scan(&value)
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, false, nil
-	}
-	return value, true, err
-}
-
-func get(r query, key string, tbl func() string) ([]byte, error) {
-
-	do := func() ([]byte, error) {
-		var value []byte
-		err := r.QueryRow(fmt.Sprintf(`
-		SELECT value FROM %s 
-		WHERE key = $1 AND strftime('%%s', 'now') < expire_at
-	`, tbl()), key).Scan(&value)
-		return value, err
-	}
-	value, err := do()
-
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, NotFound
-	}
-	if err != nil {
-		return nil, fmt.Errorf("could not get key %s, err; %w", key, err)
-	}
-	return value, nil
-}
-
-func setTTL(r query, key string, value []byte, ttl time.Duration, tbl func() string) error {
-
-	do := func() error {
-		_, err := r.Exec(fmt.Sprintf(`
-		INSERT INTO %s (key, value, expire_at, ttl) 
-		VALUES ($1, $2, strftime('%%s', 'now')+$3, $3)
-		ON CONFLICT (key)
-		    DO UPDATE 
-		    SET 
-			  value = excluded.value, 
-			  create_at =  excluded.create_at, 
-			  expire_at = excluded.expire_at, 
-			  ttl =  excluded.ttl
-	`, tbl()), key, string(value), int(ttl.Seconds()))
-		return err
-	}
-
-	err := do()
-
-	if err != nil {
-		return fmt.Errorf("could not exec, %w", err)
+		return fmt.Errorf("could not commit tx, err; %w", err)
 	}
 	return nil
+
+}
+
+// BatchSet sets a batch of key/value pairs in the cache
+// the BatchSet will take place in one transaction, but split up into sub-batches of MAX_PARAMS/3 size, ie 999/3 = 333,
+// in order to have the BatchSet be atomic. If one key fails to set, the whole batch will fail.
+// Prefer batches less then MAX_PARAMS
+func (c *Cache) BatchSet(rows []KV) error {
+	size := MAX_PARAMS / 3
+
+	if len(rows) <= size {
+		return batchSet(c.db, rows, c.ttl, c.tbl())
+	}
+
+	err := c.tx(func(tx *sql.Tx) error {
+		for i := 0; i < len(rows); i += size {
+			end := i + size
+			if end > len(rows) {
+				end = len(rows)
+			}
+			chunk := rows[i:end]
+			err := batchSet(tx, chunk, c.ttl, c.tbl())
+			if err != nil {
+				return fmt.Errorf("could not batch set, err; %w", err)
+			}
+		}
+		return nil
+	})
+
+	if err != nil {
+		return fmt.Errorf("could not set full batch, err; %w", err)
+	}
+
+	return nil
+}
+
+// BatchGet retrieves a batch of keys from the cache
+// the BatchGet will take place in one transaction, but split up into sub-batches of MAX_PARAMS size, ie 999,
+// in order to have the BatchGet be atomic. If one key fails to fetched, the whole batch will fail.
+// Prefer batches less then MAX_PARAMS
+func (c *Cache) BatchGet(keys []string) ([]KV, error) {
+
+	size := MAX_PARAMS
+
+	if len(keys) <= size {
+		return batchGet(c.db, keys, c.tbl())
+	}
+
+	var res []KV
+
+	err := c.tx(func(tx *sql.Tx) error {
+		for i := 0; i < len(keys); i += size {
+			end := i + size
+			if end > len(keys) {
+				end = len(keys)
+			}
+			chunk := keys[i:end]
+			kvs, err := batchGet(tx, chunk, c.tbl())
+			if err != nil {
+				return fmt.Errorf("could not batch get, err; %w", err)
+			}
+			res = append(res, kvs...)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not get full batch, err; %w", err)
+	}
+
+	return res, nil
+}
+
+// BatchEvict evicts a batch of keys from the cache
+// if onEvict is set, it will be called for each key
+// the eviction will take place in one transaction, but split up into bacthes of MAX_PARAMS, ie 999,
+// in order to have the eviction be atomic. If one key fails to evict, the whole batch will fail.
+// Prefer batches less then MAX_PARAMS
+func (c *Cache) BatchEvict(keys []string) (evicted []KV, err error) {
+
+	defer func() {
+		if c.onEvict != nil {
+			for _, kv := range evicted {
+				key := kv.K
+				val := kv.V
+				go c.onEvict(key, val)
+			}
+		}
+	}()
+
+	size := MAX_PARAMS
+	if len(keys) <= size {
+		evicted, err = batchEvict(c.db, keys, c.tbl())
+		return evicted, err
+	}
+
+	err = c.tx(func(tx *sql.Tx) error {
+		for i := 0; i < len(keys); i += size {
+			end := i + size
+			if end > len(keys) {
+				end = len(keys)
+			}
+			chunk := keys[i:end]
+			kvs, err := batchEvict(tx, chunk, c.tbl())
+			if err != nil {
+				return fmt.Errorf("could not batch evict, err; %w", err)
+			}
+			evicted = append(evicted, kvs...)
+		}
+		return nil
+	})
+
+	return evicted, err
+}
+
+// Evict evicts a key from the cache
+// if onEvict is set, it will be called for key
+func (c *Cache) Evict(key string) (kv KV, err error) {
+	kv, err = evict(c.db, key, c.tbl())
+	if err == nil && c.onEvict != nil {
+		go c.onEvict(kv.K, kv.V)
+	}
+	return kv, err
+}
+
+// EvictAll evicts all keys in the cache
+// onEvict will not be called
+func (c *Cache) EvictAll() (len int, err error) {
+	return evictAll(c.db, c.tbl())
+}
+
+// Range returns all key value pairs in the range [from, to]
+func (c *Cache) Range(from string, to string) (kv []KV, err error) {
+	return getRange(c.db, from, to, c.tbl())
+}
+
+// Keys returns all keys in the range [from, to]
+func (c *Cache) Keys(from string, to string) (keys []string, err error) {
+	return getKeys(c.db, from, to, c.tbl())
+}
+
+// Values returns all values in the range [from, to]
+func (c *Cache) Values(from string, to string) (values [][]byte, err error) {
+	return getValues(c.db, from, to, c.tbl())
+}
+
+// ItrRange returns an iterator for the range of keys [from, to]
+// WARNING
+// Since iterators don't really have any way of communication errors
+// the Con is that errors are dropped when using iterators.
+// the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
+func (c *Cache) ItrRange(from string, to string) iter.Seq2[string, []byte] {
+	return iterKV(c.db, from, to, c.tbl())
+}
+
+// ItrKeys returns an iterator for the range of keys [from, to]
+// WARNING
+// Since iterators don't really have any way of communication errors
+// the Con is that errors are dropped when using iterators.
+// the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
+func (c *Cache) ItrKeys(from string, to string) iter.Seq[string] {
+	return iterKeys(c.db, from, to, c.tbl())
+}
+
+// ItrValues returns an iterator for the range of values [from, to]
+// WARNING
+// Since iterators don't really have any way of communication errors
+// the Con is that errors are dropped when using iterators.
+// the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
+func (c *Cache) ItrValues(from string, to string) iter.Seq[[]byte] {
+	return iterValues(c.db, from, to, c.tbl())
+}
+
+func (c *Cache) Vacuum(max int) (n int, err error) {
+
+	kvs, err := vacuum(c.db, max, c.tbl())
+	if err != nil {
+		return 0, fmt.Errorf("could not vacuum, err; %w", err)
+	}
+
+	if c.onEvict != nil {
+		for _, kv := range kvs {
+			k := kv.K
+			v := kv.V
+			go c.onEvict(k, v)
+		}
+	}
+	return len(kvs), nil
 }
