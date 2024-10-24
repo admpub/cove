@@ -37,7 +37,7 @@ func WithLogger(log *slog.Logger) Op {
 // WithVacuum sets the vacuum function to be called in a go routine
 func WithVacuum(vacuum func(cache *Cache)) Op {
 	return func(cache *Cache) error {
-		go vacuum(cache)
+		cache.vacuum = vacuum
 		return nil
 	}
 }
@@ -116,6 +116,7 @@ type Cache struct {
 	closed        chan struct{}
 	removeOnClose *bool
 	log           *slog.Logger
+	vacuum        func(cache *Cache)
 }
 
 func New(uri string, op ...Op) (*Cache, error) {
@@ -130,9 +131,12 @@ func New(uri string, op ...Op) (*Cache, error) {
 	}
 
 	c := &Cache{
-		uri:        uri,
-		ttl:        NO_TTL,
-		onEvict:    nil,
+		uri: uri,
+		ttl: NO_TTL,
+
+		onEvict: nil,
+		vacuum:  nil,
+
 		namespace:  NS_DEFAULT,
 		namespaces: make(map[string]*Cache),
 		mu:         &sync.Mutex{},
@@ -149,6 +153,7 @@ func New(uri string, op ...Op) (*Cache, error) {
 	c.namespaces[c.namespace] = c
 
 	ops := append([]Op{dbDefault()}, op...)
+
 	for _, op := range ops {
 		err := op(c)
 		if err != nil {
@@ -163,6 +168,10 @@ func New(uri string, op ...Op) (*Cache, error) {
 	err = optimize(c)
 	if err != nil {
 		return nil, fmt.Errorf("failed in optimizing, %w", err)
+	}
+
+	if c.vacuum != nil {
+		go c.vacuum(c)
 	}
 
 	return c, nil
@@ -182,17 +191,22 @@ func (c *Cache) NS(ns string, ops ...Op) (*Cache, error) {
 	nc := &Cache{
 		uri: c.uri,
 		ttl: c.ttl,
-		//onEvict:     nil,
+
+		onEvict: nil,
+		vacuum:  c.vacuum,
+
 		namespace:  ns,
 		namespaces: c.namespaces,
-		mu:         c.mu,
-		muKey:      keyedMu(),
-		db:         c.db,
-		log:        c.log,
+
+		mu:    c.mu,
+		muKey: keyedMu(),
+
+		db: c.db,
 
 		closeOnce:     c.closeOnce,
 		closed:        c.closed,
 		removeOnClose: c.removeOnClose,
+		log:           c.log,
 	}
 
 	nc.namespaces[nc.namespace] = nc
