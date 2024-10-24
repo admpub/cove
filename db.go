@@ -311,6 +311,20 @@ func batchEvict(r query, keys []string, tbl string) ([]KV, error) {
 
 }
 
+func vacuumNoResult(r query, max int, tbl string) (int, error) {
+	q := fmt.Sprintf(`
+		DELETE FROM %s 
+		WHERE expire_at < strftime('%%s', 'now')
+		  AND key in (SELECT key FROM %s WHERE expire_at < strftime('%%s', 'now') LIMIT $1)
+	`, tbl, tbl)
+
+	res, err := r.Exec(q, max)
+	if err != nil {
+		return 0, fmt.Errorf("could not query, %w", err)
+	}
+	i, err := res.RowsAffected()
+	return int(i), err
+}
 func vacuum(r query, max int, tbl string) ([]KV, error) {
 
 	q := fmt.Sprintf(`

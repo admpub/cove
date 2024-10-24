@@ -2,7 +2,6 @@ package lcache_test
 
 import (
 	"fmt"
-	"log/slog"
 	"sort"
 	"strconv"
 	"sync"
@@ -654,7 +653,7 @@ func TestCacheVacuum(t *testing.T) {
 				lcache.URITemp(),
 				lcache.DBRemoveOnClose(),
 				lcache.WithTTL(ttl),
-				lcache.WithLogger(slog.Default()),
+				//lcache.WithLogger(slog.Default()),
 				lcache.WithVacuum(lcache.Vacuum(100*time.Millisecond, 1000)),
 				lcache.WithEvictCallback(func(k string, v []byte) {
 					mu.Lock()

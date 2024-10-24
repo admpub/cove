@@ -527,6 +527,10 @@ func (c *Cache) ItrValues(from string, to string) iter.Seq[[]byte] {
 
 func (c *Cache) Vacuum(max int) (n int, err error) {
 
+	if c.onEvict == nil { // Dont do expensive vacuum if no onEvict is set
+		return vacuumNoResult(c.db, max, c.tbl())
+	}
+
 	kvs, err := vacuum(c.db, max, c.tbl())
 	if err != nil {
 		return 0, fmt.Errorf("could not vacuum, err; %w", err)
