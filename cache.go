@@ -80,7 +80,8 @@ func dbDefault() Op {
 	}
 }
 
-// DBSyncOff is a helper function to set synchronous = off
+// DBSyncOff is a helper function to set `synchronous = off`
+//
 // this is useful for write performance but effects read performance and durability
 func DBSyncOff() Op {
 	return func(c *Cache) error {
@@ -89,8 +90,12 @@ func DBSyncOff() Op {
 }
 
 // DBPragma is a helper function to set a pragma on the database
+//
 // see https://www.sqlite.org/pragma.html
-// example: DBPragma("journal_size_limit = 6144000")
+//
+// example:
+//
+//	DBPragma("journal_size_limit = 6144000")
 func DBPragma(s string) Op {
 	return func(c *Cache) error {
 		return dbPragma(s)(c)
@@ -178,8 +183,9 @@ func New(uri string, op ...Op) (*Cache, error) {
 }
 
 // NS creates a new namespace, if the namespace already exists it will return the existing namespace.
-// onEvict must be set for every new namespace created.
-// NS will create a new table in the database for the namespace in order to isolate it, and the indexes.
+//
+// `onEvict` must be set for every new namespace created using `WithEvictCallback`.
+// `NS` will create a new table in the database for the namespace in order to isolate it, and the indexes.
 func (c *Cache) NS(ns string, ops ...Op) (*Cache, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -300,6 +306,7 @@ func (c *Cache) Get(key string) ([]byte, error) {
 }
 
 // GetOr retrieves a value from the cache, if the key does not exist it will call the setter function and set the result.
+//
 // If multiple goroutines call GetOr with the same key, only one will call the fetch function
 // the others will wait for the first to finish and retrieve the cached value from the first call.
 // It is useful paradigm to lessen a thundering herd problem.
@@ -371,9 +378,10 @@ func (c *Cache) tx(eval func(tx *sql.Tx) error) error {
 }
 
 // BatchSet sets a batch of key/value pairs in the cache
+//
 // the BatchSet will take place in one transaction, but split up into sub-batches of MAX_PARAMS/3 size, ie 999/3 = 333,
-// in order to have the BatchSet be atomic. If one key fails to set, the whole batch will fail.
-// Prefer batches less then MAX_PARAMS
+// in order to have the `BatchSet` be atomic. If one key fails to set, the whole batch will fail.
+// Prefer batches less then `MAX_PARAMS`
 func (c *Cache) BatchSet(rows []KV) error {
 	size := MAX_PARAMS / 3
 
@@ -404,9 +412,10 @@ func (c *Cache) BatchSet(rows []KV) error {
 }
 
 // BatchGet retrieves a batch of keys from the cache
-// the BatchGet will take place in one transaction, but split up into sub-batches of MAX_PARAMS size, ie 999,
-// in order to have the BatchGet be atomic. If one key fails to fetched, the whole batch will fail.
-// Prefer batches less then MAX_PARAMS
+//
+// the `BatchGet` will take place in one transaction, but split up into sub-batches of `MAX_PARAMS` size, ie 999,
+// in order to have the `BatchGet` be atomic. If one key fails to fetched, the whole batch will fail.
+// Prefer batches less then `MAX_PARAMS`
 func (c *Cache) BatchGet(keys []string) ([]KV, error) {
 
 	size := MAX_PARAMS
@@ -440,10 +449,11 @@ func (c *Cache) BatchGet(keys []string) ([]KV, error) {
 }
 
 // BatchEvict evicts a batch of keys from the cache
+//
 // if onEvict is set, it will be called for each key
-// the eviction will take place in one transaction, but split up into bacthes of MAX_PARAMS, ie 999,
+// the eviction will take place in one transaction, but split up into bacthes of `MAX_PARAMS`, ie 999,
 // in order to have the eviction be atomic. If one key fails to evict, the whole batch will fail.
-// Prefer batches less then MAX_PARAMS
+// Prefer batches less then `MAX_PARAMS`
 func (c *Cache) BatchEvict(keys []string) (evicted []KV, err error) {
 
 	defer func() {
@@ -513,28 +523,31 @@ func (c *Cache) Values(from string, to string) (values [][]byte, err error) {
 }
 
 // ItrRange returns an iterator for the range of keys [from, to]
-// WARNING
-// Since iterators don't really have any way of communication errors
-// the Con is that errors are dropped when using iterators.
-// the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
+//
+//	WARNING
+//	Since iterators don't really have any way of communication errors
+//	the Con is that errors are dropped when using iterators.
+//	the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
 func (c *Cache) ItrRange(from string, to string) iter.Seq2[string, []byte] {
 	return iterKV(c.db, from, to, c.tbl())
 }
 
 // ItrKeys returns an iterator for the range of keys [from, to]
-// WARNING
-// Since iterators don't really have any way of communication errors
-// the Con is that errors are dropped when using iterators.
-// the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
+//
+//	WARNING
+//	Since iterators don't really have any way of communication errors
+//	the Con is that errors are dropped when using iterators.
+//	the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
 func (c *Cache) ItrKeys(from string, to string) iter.Seq[string] {
 	return iterKeys(c.db, from, to, c.tbl())
 }
 
 // ItrValues returns an iterator for the range of values [from, to]
-// WARNING
-// Since iterators don't really have any way of communication errors
-// the Con is that errors are dropped when using iterators.
-// the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
+//
+//	WARNING
+//	Since iterators don't really have any way of communication errors
+//	the Con is that errors are dropped when using iterators.
+//	the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
 func (c *Cache) ItrValues(from string, to string) iter.Seq[[]byte] {
 	return iterValues(c.db, from, to, c.tbl())
 }
