@@ -80,7 +80,9 @@ func dbDefault() Op {
 	}
 }
 
-// DBSyncOff is a helper function to set `synchronous = off`
+// DBSyncOff is a helper function to set
+//
+//	synchronous = off
 //
 // this is useful for write performance but effects read performance and durability
 func DBSyncOff() Op {
@@ -184,8 +186,8 @@ func New(uri string, op ...Op) (*Cache, error) {
 
 // NS creates a new namespace, if the namespace already exists it will return the existing namespace.
 //
-// `onEvict` must be set for every new namespace created using `WithEvictCallback`.
-// `NS` will create a new table in the database for the namespace in order to isolate it, and the indexes.
+// onEvict must be set for every new namespace created using WithEvictCallback.
+// NS will create a new table in the database for the namespace in order to isolate it, and the indexes.
 func (c *Cache) NS(ns string, ops ...Op) (*Cache, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -380,8 +382,8 @@ func (c *Cache) tx(eval func(tx *sql.Tx) error) error {
 // BatchSet sets a batch of key/value pairs in the cache
 //
 // the BatchSet will take place in one transaction, but split up into sub-batches of MAX_PARAMS/3 size, ie 999/3 = 333,
-// in order to have the `BatchSet` be atomic. If one key fails to set, the whole batch will fail.
-// Prefer batches less then `MAX_PARAMS`
+// in order to have the BatchSet be atomic. If one key fails to set, the whole batch will fail.
+// Prefer batches less then MAX_PARAMS
 func (c *Cache) BatchSet(rows []KV) error {
 	size := MAX_PARAMS / 3
 
@@ -413,9 +415,9 @@ func (c *Cache) BatchSet(rows []KV) error {
 
 // BatchGet retrieves a batch of keys from the cache
 //
-// the `BatchGet` will take place in one transaction, but split up into sub-batches of `MAX_PARAMS` size, ie 999,
-// in order to have the `BatchGet` be atomic. If one key fails to fetched, the whole batch will fail.
-// Prefer batches less then `MAX_PARAMS`
+// the BatchGet will take place in one transaction, but split up into sub-batches of MAX_PARAMS size, ie 999,
+// in order to have the BatchGet be atomic. If one key fails to fetched, the whole batch will fail.
+// Prefer batches less then MAX_PARAMS
 func (c *Cache) BatchGet(keys []string) ([]KV, error) {
 
 	size := MAX_PARAMS
@@ -451,9 +453,9 @@ func (c *Cache) BatchGet(keys []string) ([]KV, error) {
 // BatchEvict evicts a batch of keys from the cache
 //
 // if onEvict is set, it will be called for each key
-// the eviction will take place in one transaction, but split up into bacthes of `MAX_PARAMS`, ie 999,
+// the eviction will take place in one transaction, but split up into bacthes of MAX_PARAMS, ie 999,
 // in order to have the eviction be atomic. If one key fails to evict, the whole batch will fail.
-// Prefer batches less then `MAX_PARAMS`
+// Prefer batches less then MAX_PARAMS
 func (c *Cache) BatchEvict(keys []string) (evicted []KV, err error) {
 
 	defer func() {

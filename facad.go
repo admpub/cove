@@ -11,20 +11,21 @@ import (
 // Of creates a typed cache facade using generics.
 // encoding/gob is used for serialization and deserialization
 //
-// Example:
-// cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
-// assert.NoError(err)
+//	 Example:
 //
-// // creates a namespace that is separate from the main cache,
-// // this helps to avoid key collisions and allows for easier management of keys
-// // when using multiple types
-// separateNamespace, err := cache.NS("my-strings")
-// assert.NoError(err)
+//		cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+//		assert.NoError(err)
 //
-// stringCache := cove.Of[string](stringNamespace)
-// stringCache.Set("hello", "typed world")
-// fmt.Println(stringCache.Get("hello"))
-// // Output: typed world <nil>
+//		// creates a namespace that is separate from the main cache,
+//		// this helps to avoid key collisions and allows for easier management of keys
+//		// when using multiple types
+//		separateNamespace, err := cache.NS("my-strings")
+//		assert.NoError(err)
+//
+//		stringCache := cove.Of[string](stringNamespace)
+//		stringCache.Set("hello", "typed world")
+//		fmt.Println(stringCache.Get("hello"))
+//		// Output: typed world <nil>
 func Of[V any](cache *Cache) *TypedCache[V] {
 	return &TypedCache[V]{
 		cache: cache,
@@ -91,10 +92,10 @@ func (t *TypedCache[V]) Values(from string, to string) (values []V, err error) {
 
 // ItrRange returns a k/v iterator for the range of keys [from, to]
 //
-// WARNING
-// Since iterators don't really have any way of communication errors
-// the Con is that errors are dropped when using iterators.
-// the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
+//	WARNING
+//	Since iterators don't really have any way of communication errors
+//	the Con is that errors are dropped when using iterators.
+//	the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
 func (t *TypedCache[V]) ItrRange(from string, to string) iter.Seq2[string, V] {
 	return func(yield func(string, V) bool) {
 		t.cache.ItrRange(from, to)(func(k string, v []byte) bool {
@@ -109,20 +110,20 @@ func (t *TypedCache[V]) ItrRange(from string, to string) iter.Seq2[string, V] {
 
 // ItrKeys returns a key iterator for the range of keys [from, to]
 //
-// WARNING
-// Since iterators don't really have any way of communication errors
-// the Con is that errors are dropped when using iterators.
-// the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
+//	WARNING
+//	Since iterators don't really have any way of communication errors
+//	the Con is that errors are dropped when using iterators.
+//	the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
 func (t *TypedCache[V]) ItrKeys(from string, to string) iter.Seq[string] {
 	return t.cache.ItrKeys(from, to)
 }
 
 // ItrValues returns a value iterator for the range of keys [from, to]
 //
-// WARNING
-// Since iterators don't really have any way of communication errors
-// the Con is that errors are dropped when using iterators.
-// the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
+//	WARNING
+//	Since iterators don't really have any way of communication errors
+//	the Con is that errors are dropped when using iterators.
+//	the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
 func (t *TypedCache[V]) ItrValues(from string, to string) iter.Seq[V] {
 	return func(yield func(V) bool) {
 		t.cache.ItrValues(from, to)(func(v []byte) bool {
@@ -180,6 +181,7 @@ func (t *TypedCache[V]) GetOr(key string, getter func(key string) (V, error)) (V
 }
 
 // BatchSet sets a batch of key/value pairs in the cache
+//
 // the BatchSet will take place in one transaction, but split up into sub-batches of MAX_PARAMS/3 size, ie 999/3 = 333,
 // in order to have the BatchSet be atomic. If one key fails to set, the whole batch will fail.
 // Prefer batches less then MAX_PARAMS
@@ -196,6 +198,7 @@ func (t *TypedCache[V]) BatchSet(ziped []KVt[V]) error {
 }
 
 // BatchGet retrieves a batch of keys from the cache
+//
 // the BatchGet will take place in one transaction, but split up into sub-batches of MAX_PARAMS size, ie 999,
 // in order to have the BatchGet be atomic. If one key fails to fetched, the whole batch will fail.
 // Prefer batches less then MAX_PARAMS
@@ -216,6 +219,7 @@ func (t *TypedCache[V]) BatchGet(keys []string) ([]KVt[V], error) {
 }
 
 // BatchEvict evicts a batch of keys from the cache
+//
 // if onEvict is set, it will be called for each key
 // the eviction will take place in one transaction, but split up into bacthes of MAX_PARAMS, ie 999,
 // in order to have the eviction be atomic. If one key fails to evict, the whole batch will fail.
@@ -237,12 +241,14 @@ func (t *TypedCache[V]) BatchEvict(keys []string) ([]KVt[V], error) {
 }
 
 // EvictAll evicts all keys in the cache
+//
 // onEvict will not be called
 func (t *TypedCache[V]) EvictAll() (int, error) {
 	return t.cache.EvictAll()
 }
 
 // Evict evicts a key from the cache
+//
 // if onEvict is set, it will be called for key
 func (t *TypedCache[V]) Evict(key string) (KVt[V], error) {
 	var res KVt[V]
