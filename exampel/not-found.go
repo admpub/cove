@@ -45,7 +45,6 @@ func main() {
 	}
 
 	// Or the opposite for convenience using Mis
-	_, err = cache.Get("key")
 
 	// A nice pattern to use to split the error handling from the logic of hit or not might be the following
 	_, err = cache.Get("key")

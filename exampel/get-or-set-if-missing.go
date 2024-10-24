@@ -62,8 +62,9 @@ func main() {
 	// ....
 	// ....
 
-	// Seperate namespace can of course lock on the same key without interfering with each other
+	// Separate namespace can of course lock on the same key without interfering with each other
 	cache2, err := cache.NS("cache2")
+	assertNoErr(err)
 
 	wg = sync.WaitGroup{}
 	for i := 0; i < 10; i++ {
