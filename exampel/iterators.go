@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/modfin/lcache"
+	"github.com/modfin/cove"
 	"time"
 )
 
@@ -22,9 +22,9 @@ func main() {
 	// creates a sqlite cache in a temporary directory,
 	//  once the cache is closed the database is removed
 	//  a default TTL of 10 minutes is set
-	cache, err := lcache.New(lcache.URITemp(),
-		lcache.DBRemoveOnClose(),
-		lcache.WithTTL(time.Minute*10),
+	cache, err := cove.New(cove.URITemp(),
+		cove.DBRemoveOnClose(),
+		cove.WithTTL(time.Minute*10),
 	)
 	assertNoErr(err)
 	defer cache.Close()
@@ -36,7 +36,7 @@ func main() {
 	}
 
 	// KV iterator
-	for k, v := range cache.ItrRange("key97", lcache.RANGE_MAX) {
+	for k, v := range cache.ItrRange("key97", cove.RANGE_MAX) {
 		fmt.Println(k, string(v))
 		//key97 value97
 		//key98 value98
@@ -44,14 +44,14 @@ func main() {
 	}
 
 	// Key iterator
-	for key := range cache.ItrKeys(lcache.RANGE_MIN, "key1") {
+	for key := range cache.ItrKeys(cove.RANGE_MIN, "key1") {
 		fmt.Println(key)
 		//key0
 		//key1
 	}
 
 	// Value iterator
-	for value := range cache.ItrValues(lcache.RANGE_MIN, "key1") {
+	for value := range cache.ItrValues(cove.RANGE_MIN, "key1") {
 		fmt.Println(string(value))
 		//value0
 		//value1

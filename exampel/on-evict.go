@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/modfin/lcache"
+	"github.com/modfin/cove"
 )
 
 func assertNoErr(err error) {
@@ -13,12 +13,12 @@ func assertNoErr(err error) {
 
 func main() {
 
-	// creates a sqlite cache named ./lcache.db in the directory of the execution
+	// creates a sqlite cache named ./cove.db in the directory of the execution
 	//  it adds a callback function for eviction notices
-	cache, err := lcache.New(
-		lcache.URITemp(),
-		lcache.DBRemoveOnClose(),
-		lcache.WithEvictCallback(
+	cache, err := cove.New(
+		cove.URITemp(),
+		cove.DBRemoveOnClose(),
+		cove.WithEvictCallback(
 			func(key string, val []byte) {
 				fmt.Printf("evicted %s: %s\n", key, string(val))
 				// Maybe do som stuff, proactively refresh the cache

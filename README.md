@@ -1,11 +1,61 @@
-# lcache
+# Cove
 
-`lcache` is a caching library for Go that utilizes SQLite as the storage backend. It provides a simple and efficient way to cache key-value pairs with support for TTL (Time-To-Live), namespaces, batch operations, range scans and eviction callbacks.
+`cove` is a caching library for Go that utilizes SQLite as the storage backend. It provides a simple and efficient way to cache key-value pairs with support for TTL (Time-To-Live), namespaces, batch operations, range scans and eviction callbacks.
+
+
+## TL;DR
+
+Simple caching library for Go backed by SQLite
+
+```bash 
+go get github.com/modfin/cove
+```
+
+```go
+package main
+
+import (
+	"fmt"
+	"github.com/modfin/cove"
+	"strings"
+	"time"
+)
+
+func main() {
+	cache, err := cove.New(
+		cove.URITemp(),
+	)
+	if err != nil {
+		panic(err)
+	}
+	defer cache.Close()
+
+	ns, err := cache.NS("strings")
+	if err != nil {
+		panic(err)
+	}
+	stringCache := cove.Of[string](ns)
+
+	stringCache.Set("key", "the string")
+
+	str, err := stringCache.Get("key")
+	found, err := cove.Hit(err)
+	if err != nil {
+		panic(err)
+	}
+	if found {
+		fmt.Println(str) // Output: the string
+	}
+
+}
+
+```
+
 
 ## Use case
-lcache is meant to be embedded into your application, and not as a standalone service. It is a simple key-value store that is meant to be used for caching data that is expensive to compute or retrieve. 
+cove is meant to be embedded into your application, and not as a standalone service. It is a simple key-value store that is meant to be used for caching data that is expensive to compute or retrieve. 
 
-lcache can also be used as simple key-value store
+cove can also be used as simple key-value store
 
 using SQLite as a storage backend comes with some benefits such as
 - Transactions and ACID
@@ -16,10 +66,10 @@ using SQLite as a storage backend comes with some benefits such as
 
 ## Installation
 
-To install `lcache`, use `go get`:
+To install `cove`, use `go get`:
 
 ```sh
-go get github.com/modfin/lcache
+go get github.com/modfin/cove
 ```
 
 ## Usage
@@ -32,15 +82,15 @@ To create a cache, use the `New` function. You can specify various options such 
 package main
 
 import (
-    "github.com/modfin/lcache"
+    "github.com/modfin/cove"
     "time"
 )
 
 func main() {
-    cache, err := lcache.New(
-        lcache.URITemp(),
-        lcache.DBRemoveOnClose(),
-        lcache.WithTTL(time.Minute*10),
+    cache, err := cove.New(
+        cove.URITemp(),
+        cove.DBRemoveOnClose(),
+        cove.WithTTL(time.Minute*10),
     )
     if err != nil {
         panic(err)
@@ -58,15 +108,15 @@ package main
 
 import (
     "fmt"
-    "github.com/modfin/lcache"
+    "github.com/modfin/cove"
     "time"
 )
 
 func main() {
-    cache, err := lcache.New(
-        lcache.URITemp(),
-        lcache.DBRemoveOnClose(),
-        lcache.WithTTL(time.Minute*10),
+    cache, err := cove.New(
+        cove.URITemp(),
+        cove.DBRemoveOnClose(),
+        cove.WithTTL(time.Minute*10),
     )
     if err != nil {
         panic(err)
@@ -97,16 +147,16 @@ Namespaces allow you to isolate different sets of keys within the same cache.
 package main
 
 import (
-    "github.com/modfin/lcache"
+    "github.com/modfin/cove"
     "time"
 	"fmt"
 )
 
 func main() {
-    cache, err := lcache.New(
-        lcache.URITemp(),
-        lcache.DBRemoveOnClose(),
-        lcache.WithTTL(time.Minute*10),
+    cache, err := cove.New(
+        cove.URITemp(),
+        cove.DBRemoveOnClose(),
+        cove.WithTTL(time.Minute*10),
     )
     if err != nil {
         panic(err)
@@ -147,14 +197,14 @@ package main
 
 import (
     "fmt"
-    "github.com/modfin/lcache"
+    "github.com/modfin/cove"
 )
 
 func main() {
-    cache, err := lcache.New(
-        lcache.URITemp(),
-        lcache.DBRemoveOnClose(),
-        lcache.WithEvictCallback(func(key string, val []byte) {
+    cache, err := cove.New(
+        cove.URITemp(),
+        cove.DBRemoveOnClose(),
+        cove.WithEvictCallback(func(key string, val []byte) {
             fmt.Printf("evicted %s: %s\n", key, string(val))
         }),
     )
@@ -190,15 +240,15 @@ package main
 
 import (
     "fmt"
-    "github.com/modfin/lcache"
+    "github.com/modfin/cove"
     "time"
 )
 
 func main() {
-    cache, err := lcache.New(
-        lcache.URITemp(),
-        lcache.DBRemoveOnClose(),
-        lcache.WithTTL(time.Minute*10),
+    cache, err := cove.New(
+        cove.URITemp(),
+        cove.DBRemoveOnClose(),
+        cove.WithTTL(time.Minute*10),
     )
     if err != nil {
         panic(err)
@@ -213,17 +263,17 @@ func main() {
     }
 
     // KV iterator
-    for k, v := range cache.ItrRange("key97", lcache.RANGE_MAX) {
+    for k, v := range cache.ItrRange("key97", cove.RANGE_MAX) {
         fmt.Println(k, string(v))
     }
 
     // Key iterator
-    for key := range cache.ItrKeys(lcache.RANGE_MIN, "key1") {
+    for key := range cache.ItrKeys(cove.RANGE_MIN, "key1") {
         fmt.Println(key)
     }
 
     // Value iterator
-    for value := range cache.ItrValues(lcache.RANGE_MIN, "key1") {
+    for value := range cache.ItrValues(cove.RANGE_MIN, "key1") {
         fmt.Println(string(value))
     }
 }
@@ -241,15 +291,15 @@ package main
 import (
     "errors"
     "fmt"
-    "github.com/modfin/lcache"
+    "github.com/modfin/cove"
     "time"
 )
 
 func main() {
-    cache, err := lcache.New(
-        lcache.URITemp(),
-        lcache.DBRemoveOnClose(),
-        lcache.WithTTL(time.Minute*10),
+    cache, err := cove.New(
+        cove.URITemp(),
+        cove.DBRemoveOnClose(),
+        cove.WithTTL(time.Minute*10),
     )
     if err != nil {
         panic(err)
@@ -257,11 +307,11 @@ func main() {
     defer cache.Close()
 
     _, err = cache.Get("key")
-    fmt.Println("err == lcache.NotFound:", err == lcache.NotFound)
-    fmt.Println("errors.Is(err, lcache.NotFound):", errors.Is(err, lcache.NotFound))
+    fmt.Println("err == cove.NotFound:", err == cove.NotFound)
+    fmt.Println("errors.Is(err, cove.NotFound):", errors.Is(err, cove.NotFound))
 
     _, err = cache.Get("key")
-    hit, err := lcache.Hit(err)
+    hit, err := cove.Hit(err)
     if err != nil {
         panic(err)
     }
@@ -270,7 +320,7 @@ func main() {
     }
 
     _, err = cache.Get("key")
-    miss, err := lcache.Miss(err)
+    miss, err := cove.Miss(err)
     if err != nil {
         panic(err)
     }
@@ -283,7 +333,7 @@ func main() {
 
 ### Typed Cache
 
-The `TypedCache` in `lcache` provides a way to work with strongly-typed values in the cache, using Go generics. This allows you to avoid manual serialization and deserialization of values, making the code cleaner and less error-prone.
+The `TypedCache` in `cove` provides a way to work with strongly-typed values in the cache, using Go generics. This allows you to avoid manual serialization and deserialization of values, making the code cleaner and less error-prone.
 
 #### Creating a Typed Cache
 
@@ -294,7 +344,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/modfin/lcache"
+	"github.com/modfin/cove"
 	"time"
 )
 
@@ -311,10 +361,10 @@ type Person struct {
 
 func main() {
 	// Create a base cache
-	cache, err := lcache.New(
-		lcache.URITemp(),
-		lcache.DBRemoveOnClose(),
-		lcache.WithTTL(time.Minute*10),
+	cache, err := cove.New(
+		cove.URITemp(),
+		cove.DBRemoveOnClose(),
+		cove.WithTTL(time.Minute*10),
 	)
 	assertNoErr(err)
 	defer cache.Close()
@@ -323,7 +373,7 @@ func main() {
 	assertNoErr(err)
 	
 	// Create a typed cache for Person struct
-	typedCache := lcache.Of[Person](personNamespace)
+	typedCache := cove.Of[Person](personNamespace)
 
 	// Set a value in the typed cache
 	err = typedCache.Set("alice", Person{Name: "Alice", Age: 30})

@@ -1,4 +1,4 @@
-package lcache
+package cove
 
 import (
 	"bytes"
@@ -12,7 +12,7 @@ import (
 // encoding/gob is used for serialization and deserialization
 //
 // Example:
-// cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+// cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 // assert.NoError(err)
 //
 // // creates a namespace that is separate from the main cache,
@@ -21,7 +21,7 @@ import (
 // separateNamespace, err := cache.NS("my-strings")
 // assert.NoError(err)
 //
-// stringCache := lcache.Of[string](stringNamespace)
+// stringCache := cove.Of[string](stringNamespace)
 // stringCache.Set("hello", "typed world")
 // fmt.Println(stringCache.Get("hello"))
 // // Output: typed world <nil>

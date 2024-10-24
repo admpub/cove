@@ -1,4 +1,4 @@
-module github.com/modfin/lcache
+module github.com/modfin/cove
 
 go 1.23.0
 

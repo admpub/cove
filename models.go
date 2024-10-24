@@ -1,4 +1,4 @@
-package lcache
+package cove
 
 import (
 	"errors"

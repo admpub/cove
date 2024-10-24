@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/modfin/lcache"
+	"github.com/modfin/cove"
 	"time"
 )
 
@@ -17,10 +17,10 @@ func main() {
 	// creates a sqlite cache in a temporary directory,
 	//  once the cache is closed the database is removed
 	//  a default TTL of 10 minutes is set
-	cache, err := lcache.New(
-		lcache.URITemp(),
-		lcache.DBRemoveOnClose(),
-		lcache.WithTTL(time.Minute*10),
+	cache, err := cove.New(
+		cove.URITemp(),
+		cove.DBRemoveOnClose(),
+		cove.WithTTL(time.Minute*10),
 	)
 	assertNoErr(err)
 	defer cache.Close()

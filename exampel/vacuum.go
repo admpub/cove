@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/modfin/lcache"
+	"github.com/modfin/cove"
 	"log/slog"
 	"time"
 )
@@ -19,20 +19,20 @@ func main() {
 	//  a default TTL of 500ms
 	//  a logger is set to default slog.Default()
 	//  a vacuum is set to run every 100ms, and vacuum at most 1000 items at a time
-	cache, err := lcache.New(
-		lcache.URITemp(),
-		lcache.DBRemoveOnClose(),
-		lcache.WithTTL(time.Millisecond*500),
+	cache, err := cove.New(
+		cove.URITemp(),
+		cove.DBRemoveOnClose(),
+		cove.WithTTL(time.Millisecond*500),
 
-		lcache.WithLogger(slog.Default()),
+		cove.WithLogger(slog.Default()),
 
 		// vacuum every 100ms, and vacuum at most 1000 items at a time
 		// This might be important to calibrate from your use case, as it might cause a lot of writes to the database
 		// along with on-evict calls for expired items.
-		lcache.WithVacuum(lcache.Vacuum(100*time.Millisecond, 1_000)),
+		cove.WithVacuum(cove.Vacuum(100*time.Millisecond, 1_000)),
 
 		// on-evict callback prints the key that is evicted
-		lcache.WithEvictCallback(func(key string, value []byte) {
+		cove.WithEvictCallback(func(key string, value []byte) {
 			slog.Default().Info("evicting", "key", key)
 		}),
 	)
@@ -52,7 +52,7 @@ func main() {
 	assertNoErr(err)
 
 	time.Sleep(time.Second)
-	//2024/10/24 17:05:16 INFO [lcache] vacuumed ns=default time=736.684µs n=3
+	//2024/10/24 17:05:16 INFO [cove] vacuumed ns=default time=736.684µs n=3
 	//2024/10/24 17:05:16 INFO evicting key=key
 	//2024/10/24 17:05:16 INFO evicting key=key1
 	//2024/10/24 17:05:16 INFO evicting key=key2

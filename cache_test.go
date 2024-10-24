@@ -1,7 +1,8 @@
-package lcache_test
+package cove_test
 
 import (
 	"fmt"
+	"github.com/modfin/cove"
 	"sort"
 	"strconv"
 	"sync"
@@ -9,19 +10,18 @@ import (
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
-	"github.com/modfin/lcache"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestNewCacheWithTempUri(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	assert.NotNil(t, cache)
 	defer cache.Close()
 }
 
 func TestCacheSetAndGet(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -39,7 +39,7 @@ func TestCacheSetAndGet(t *testing.T) {
 func TestCacheSetAndGetSize(t *testing.T) {
 	do := func(size int) func(t *testing.T) {
 		return func(t *testing.T) {
-			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 			assert.NoError(t, err)
 			defer cache.Close()
 
@@ -72,7 +72,7 @@ func TestCacheSetAndGetSize(t *testing.T) {
 }
 
 func TestCacheSetGetEmpty(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -88,7 +88,7 @@ func TestCacheSetGetEmpty(t *testing.T) {
 }
 
 func TestCacheSetGetNil(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -104,7 +104,7 @@ func TestCacheSetGetNil(t *testing.T) {
 }
 
 func TestCacheGetOrSet(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -119,7 +119,7 @@ func TestCacheGetOrSet(t *testing.T) {
 }
 
 func TestCacheGetOrSetParallel(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -150,7 +150,7 @@ func TestCacheGetOrSetParallel(t *testing.T) {
 }
 
 func TestCacheGetOrSetParallelMem(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -181,7 +181,7 @@ func TestCacheGetOrSetParallelMem(t *testing.T) {
 }
 
 func TestCacheEvict(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -197,11 +197,11 @@ func TestCacheEvict(t *testing.T) {
 
 	_, err = cache.Get(key)
 	assert.Error(t, err)
-	assert.Equal(t, lcache.NotFound, err)
+	assert.Equal(t, cove.NotFound, err)
 }
 
 func TestCacheSetTTL(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -216,11 +216,11 @@ func TestCacheSetTTL(t *testing.T) {
 
 	_, err = cache.Get(key)
 	assert.Error(t, err)
-	assert.Equal(t, lcache.NotFound, err)
+	assert.Equal(t, cove.NotFound, err)
 }
 
 func TestCache_Range(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -233,7 +233,7 @@ func TestCache_Range(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test ItrRange
-	kv, err := cache.Range(lcache.RANGE_MIN, lcache.RANGE_MAX)
+	kv, err := cache.Range(cove.RANGE_MIN, cove.RANGE_MAX)
 	assert.NoError(t, err)
 	assert.Equal(t, 3, len(kv))
 	assert.Equal(t, "value1", string(kv[0].V))
@@ -242,7 +242,7 @@ func TestCache_Range(t *testing.T) {
 }
 
 func TestCache_Keys(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -253,7 +253,7 @@ func TestCache_Keys(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test ItrKeys
-	keys, err := cache.Keys(lcache.RANGE_MIN, lcache.RANGE_MAX)
+	keys, err := cache.Keys(cove.RANGE_MIN, cove.RANGE_MAX)
 	assert.NoError(t, err)
 	assert.Equal(t, 2, len(keys))
 	assert.Equal(t, "key1", keys[0])
@@ -261,7 +261,7 @@ func TestCache_Keys(t *testing.T) {
 }
 
 func TestCache_Values(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -280,12 +280,12 @@ func TestCache_Values(t *testing.T) {
 }
 
 func TestCacheRange(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
 	// Set some key-value pairs in the cache
-	pairs := []lcache.KV{
+	pairs := []cove.KV{
 		{"key1", []byte("value1")},
 		{"key2", []byte("value2")},
 		{"key3:and:more", []byte("value3")},
@@ -294,7 +294,7 @@ func TestCacheRange(t *testing.T) {
 		{"key6", []byte("value6")},
 	}
 
-	exp := []lcache.KV{
+	exp := []cove.KV{
 		{"key2", []byte("value2")},
 		{"key3:and:more", []byte("value3")},
 		{"key4", []byte("value4")},
@@ -321,12 +321,12 @@ func TestCacheRange(t *testing.T) {
 }
 
 func TestCacheIter(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
 	// Set some key-value pairs in the cache
-	pairs := []lcache.KV{
+	pairs := []cove.KV{
 		{"key1", []byte("value1")},
 		{"key2", []byte("value2")},
 		{"key3:and:more", []byte("value3")},
@@ -335,7 +335,7 @@ func TestCacheIter(t *testing.T) {
 		{"key7", []byte("value6")},
 	}
 
-	exp := []lcache.KV{
+	exp := []cove.KV{
 		{"key2", []byte("value2")},
 		{"key3:and:more", []byte("value3")},
 		{"key4", []byte("value4")},
@@ -346,10 +346,10 @@ func TestCacheIter(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	var res []lcache.KV
+	var res []cove.KV
 
 	for k, v := range cache.ItrRange("key2", "key4") {
-		res = append(res, lcache.KV{
+		res = append(res, cove.KV{
 			K: k,
 			V: v,
 		})
@@ -372,7 +372,7 @@ func TestCacheIter(t *testing.T) {
 }
 
 func TestNS(t *testing.T) {
-	c1, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	c1, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer c1.Close()
 
@@ -390,19 +390,19 @@ func TestNS(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("ns2"), v)
 
-	c11, err := c2.NS(lcache.NS_DEFAULT)
+	c11, err := c2.NS(cove.NS_DEFAULT)
 	assert.NoError(t, err)
 	v, err = c11.Get("key1")
 	assert.NoError(t, err)
 	assert.Equal(t, []byte("ns1"), v)
 
 	_, err = c11.Evict("key1")
-	hit, err := lcache.Hit(err)
+	hit, err := cove.Hit(err)
 	assert.NoError(t, err)
 	assert.True(t, hit)
 
 	_, err = c1.Evict("key1")
-	hit, err = lcache.Hit(err)
+	hit, err = cove.Hit(err)
 	assert.NoError(t, err)
 	assert.False(t, hit)
 
@@ -412,13 +412,13 @@ func TestCacheBatchSetSizes(t *testing.T) {
 
 	do := func(itre int) func(t *testing.T) {
 		return func(t *testing.T) {
-			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 			assert.NoError(t, err)
 			defer cache.Close()
 
-			var rows []lcache.KV
+			var rows []cove.KV
 			for i := 0; i < itre; i++ {
-				rows = append(rows, lcache.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))})
+				rows = append(rows, cove.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))})
 			}
 
 			err = cache.BatchSet(rows)
@@ -437,13 +437,13 @@ func TestCacheBatchSetSizes(t *testing.T) {
 	t.Run("100", do(100))
 	t.Run("101", do(101))
 
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3-1), do(lcache.MAX_PARAMS/3-1))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3), do(lcache.MAX_PARAMS/3))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3+1), do(lcache.MAX_PARAMS/3+1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS/3-1), do(cove.MAX_PARAMS/3-1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS/3), do(cove.MAX_PARAMS/3))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS/3+1), do(cove.MAX_PARAMS/3+1))
 
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS-1), do(lcache.MAX_PARAMS-1))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS), do(lcache.MAX_PARAMS))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS+1), do(lcache.MAX_PARAMS+1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS-1), do(cove.MAX_PARAMS-1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS), do(cove.MAX_PARAMS))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS+1), do(cove.MAX_PARAMS+1))
 
 	t.Run("1_013", do(1013))
 	t.Run("10_000", do(10000))
@@ -455,14 +455,14 @@ func TestCacheBatchGetSizes(t *testing.T) {
 
 	do := func(itre int) func(t *testing.T) {
 		return func(t *testing.T) {
-			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 			assert.NoError(t, err)
 			defer cache.Close()
 
 			var keys []string
-			var rows []lcache.KV
+			var rows []cove.KV
 			for i := 0; i < itre; i++ {
-				kv := lcache.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
+				kv := cove.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
 				rows = append(rows, kv)
 				keys = append(keys, kv.K)
 				err = cache.Set(kv.K, kv.V)
@@ -496,13 +496,13 @@ func TestCacheBatchGetSizes(t *testing.T) {
 	t.Run("100", do(100))
 	t.Run("101", do(101))
 
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3-1), do(lcache.MAX_PARAMS/3-1))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3), do(lcache.MAX_PARAMS/3))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3+1), do(lcache.MAX_PARAMS/3+1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS/3-1), do(cove.MAX_PARAMS/3-1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS/3), do(cove.MAX_PARAMS/3))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS/3+1), do(cove.MAX_PARAMS/3+1))
 
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS-1), do(lcache.MAX_PARAMS-1))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS), do(lcache.MAX_PARAMS))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS+1), do(lcache.MAX_PARAMS+1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS-1), do(cove.MAX_PARAMS-1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS), do(cove.MAX_PARAMS))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS+1), do(cove.MAX_PARAMS+1))
 
 	t.Run("1_013", do(1013))
 	t.Run("10_000", do(10000))
@@ -515,26 +515,26 @@ func TestCacheBatchEvictSizes(t *testing.T) {
 	do := func(itre int) func(t *testing.T) {
 		return func(t *testing.T) {
 
-			var evicted []lcache.KV
+			var evicted []cove.KV
 			var mu sync.Mutex
 			wgEvicted := sync.WaitGroup{}
 			wgEvicted.Add(itre)
 
-			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose(),
-				lcache.WithEvictCallback(func(k string, v []byte) {
+			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(),
+				cove.WithEvictCallback(func(k string, v []byte) {
 					mu.Lock()
 					defer mu.Unlock()
 					defer wgEvicted.Done()
-					evicted = append(evicted, lcache.KV{K: k, V: v})
+					evicted = append(evicted, cove.KV{K: k, V: v})
 				}),
 			)
 			assert.NoError(t, err)
 			defer cache.Close()
 
 			var keys []string
-			var rows []lcache.KV
+			var rows []cove.KV
 			for i := 0; i < itre; i++ {
-				kv := lcache.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
+				kv := cove.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
 				rows = append(rows, kv)
 				keys = append(keys, kv.K)
 				err = cache.Set(kv.K, kv.V)
@@ -560,7 +560,7 @@ func TestCacheBatchEvictSizes(t *testing.T) {
 
 				_, err = cache.Get(row.K)
 				assert.Error(t, err)
-				assert.Equal(t, lcache.NotFound, err)
+				assert.Equal(t, cove.NotFound, err)
 			}
 
 			wgEvicted.Wait()
@@ -577,13 +577,13 @@ func TestCacheBatchEvictSizes(t *testing.T) {
 	t.Run("100", do(100))
 	t.Run("101", do(101))
 
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3-1), do(lcache.MAX_PARAMS/3-1))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3), do(lcache.MAX_PARAMS/3))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS/3+1), do(lcache.MAX_PARAMS/3+1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS/3-1), do(cove.MAX_PARAMS/3-1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS/3), do(cove.MAX_PARAMS/3))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS/3+1), do(cove.MAX_PARAMS/3+1))
 
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS-1), do(lcache.MAX_PARAMS-1))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS), do(lcache.MAX_PARAMS))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS+1), do(lcache.MAX_PARAMS+1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS-1), do(cove.MAX_PARAMS-1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS), do(cove.MAX_PARAMS))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS+1), do(cove.MAX_PARAMS+1))
 
 	t.Run("1_013", do(1013))
 	t.Run("10_000", do(10000))
@@ -592,11 +592,11 @@ func TestCacheBatchEvictSizes(t *testing.T) {
 }
 
 func TestCacheBatchSet(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
-	rows := []lcache.KV{
+	rows := []cove.KV{
 		{K: "key1", V: []byte("value1")},
 		{K: "key2", V: []byte("value2")},
 		{K: "key3", V: []byte("value3")},
@@ -613,11 +613,11 @@ func TestCacheBatchSet(t *testing.T) {
 }
 
 func TestCacheBatchGet(t *testing.T) {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	defer cache.Close()
 
-	rows := []lcache.KV{
+	rows := []cove.KV{
 		{K: "key1", V: []byte("value1")},
 		{K: "key2", V: []byte("value2")},
 		{K: "key3", V: []byte("value3")},
@@ -642,32 +642,32 @@ func TestCacheVacuum(t *testing.T) {
 	do := func(itre int) func(t *testing.T) {
 		return func(t *testing.T) {
 
-			var evicted []lcache.KV
+			var evicted []cove.KV
 			var mu sync.Mutex
 			wgEvicted := sync.WaitGroup{}
 			wgEvicted.Add(itre)
 
 			ttl := 500 * time.Millisecond
 
-			cache, err := lcache.New(
-				lcache.URITemp(),
-				lcache.DBRemoveOnClose(),
-				lcache.WithTTL(ttl),
-				//lcache.WithLogger(slog.Default()),
-				lcache.WithVacuum(lcache.Vacuum(100*time.Millisecond, 1000)),
-				lcache.WithEvictCallback(func(k string, v []byte) {
+			cache, err := cove.New(
+				cove.URITemp(),
+				cove.DBRemoveOnClose(),
+				cove.WithTTL(ttl),
+				//cove.WithLogger(slog.Default()),
+				cove.WithVacuum(cove.Vacuum(100*time.Millisecond, 1000)),
+				cove.WithEvictCallback(func(k string, v []byte) {
 					mu.Lock()
 					defer mu.Unlock()
 					defer wgEvicted.Done()
-					evicted = append(evicted, lcache.KV{K: k, V: v})
+					evicted = append(evicted, cove.KV{K: k, V: v})
 				}),
 			)
 			assert.NoError(t, err)
 			defer cache.Close()
 
-			var rows []lcache.KV
+			var rows []cove.KV
 			for i := 0; i < itre; i++ {
-				kv := lcache.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
+				kv := cove.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
 				rows = append(rows, kv)
 			}
 
@@ -700,7 +700,7 @@ func TestCacheVacuum(t *testing.T) {
 
 //
 //func BenchmarkCacheSet(b *testing.B) {
-//	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+//	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 //	assert.NoError(b, err)
 //	defer cache.Close()
 //
@@ -719,7 +719,7 @@ func TestCacheVacuum(t *testing.T) {
 //}
 //
 //func BenchmarkCacheGet(b *testing.B) {
-//	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+//	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 //	assert.NoError(b, err)
 //	defer cache.Close()
 //
@@ -738,9 +738,9 @@ func TestCacheVacuum(t *testing.T) {
 //
 //func BenchmarkCacheLargeSetGet(bbb *testing.B) {
 //
-//	bench := func(op ...lcache.Op) func(*testing.B) {
+//	bench := func(op ...cove.Op) func(*testing.B) {
 //		return func(b *testing.B) {
-//			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose(), op...)
+//			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), op...)
 //			assert.NoError(b, err)
 //			defer cache.Close()
 //
@@ -767,21 +767,21 @@ func TestCacheVacuum(t *testing.T) {
 //		}
 //	}
 //
-//	bbb.Run("default", bench(lcache.dbDefault()))
-//	bbb.Run("default/op_journal", bench(lcache.dbDefault(), lcache.DBJournalSize(lcache.OptimizedJournalSize)))
-//	bbb.Run("default/sync_off", bench(lcache.dbDefault(), lcache.DBSyncOff()))
-//	bbb.Run("default/sync_off/op_journal", bench(lcache.dbDefault(), lcache.DBSyncOff(), lcache.DBJournalSize(lcache.OptimizedJournalSize)))
+//	bbb.Run("default", bench(cove.dbDefault()))
+//	bbb.Run("default/op_journal", bench(cove.dbDefault(), cove.DBJournalSize(cove.OptimizedJournalSize)))
+//	bbb.Run("default/sync_off", bench(cove.dbDefault(), cove.DBSyncOff()))
+//	bbb.Run("default/sync_off/op_journal", bench(cove.dbDefault(), cove.DBSyncOff(), cove.DBJournalSize(cove.OptimizedJournalSize)))
 //
-//	//bbb.Run("optimized", bench(lcache.DBFullOptimize()))
-//	//bbb.Run("optimized sync off", bench(lcache.DBFullOptimize(), lcache.DBSyncOff()))
+//	//bbb.Run("optimized", bench(cove.DBFullOptimize()))
+//	//bbb.Run("optimized sync off", bench(cove.DBFullOptimize(), cove.DBSyncOff()))
 //
 //}
 //
 //func BenchmarkCacheRealWorld(bbb *testing.B) {
 //
-//	bench := func(op ...lcache.Op) func(*testing.B) {
+//	bench := func(op ...cove.Op) func(*testing.B) {
 //		return func(b *testing.B) {
-//			cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose(), op...)
+//			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), op...)
 //			assert.NoError(b, err)
 //			defer cache.Close()
 //
@@ -847,7 +847,7 @@ func TestCacheVacuum(t *testing.T) {
 //				for pb.Next() {
 //					key := strconv.Itoa(int(rand.Float64() * float64(b.N)))
 //					_, err := cache.Get(key)
-//					if errors.Is(lcache.NotFound, err) {
+//					if errors.Is(cove.NotFound, err) {
 //						continue
 //					}
 //					assert.NoError(b, err)
@@ -862,12 +862,12 @@ func TestCacheVacuum(t *testing.T) {
 //
 //	}
 //
-//	bbb.Run("default", bench(lcache.dbDefault()))
-//	bbb.Run("default/op_journal", bench(lcache.dbDefault(), lcache.DBJournalSize(lcache.OptimizedJournalSize)))
-//	bbb.Run("default/sync_off", bench(lcache.dbDefault(), lcache.DBSyncOff()))
-//	bbb.Run("default/sync_off/op_journal", bench(lcache.dbDefault(), lcache.DBSyncOff(), lcache.DBJournalSize(lcache.OptimizedJournalSize)))
+//	bbb.Run("default", bench(cove.dbDefault()))
+//	bbb.Run("default/op_journal", bench(cove.dbDefault(), cove.DBJournalSize(cove.OptimizedJournalSize)))
+//	bbb.Run("default/sync_off", bench(cove.dbDefault(), cove.DBSyncOff()))
+//	bbb.Run("default/sync_off/op_journal", bench(cove.dbDefault(), cove.DBSyncOff(), cove.DBJournalSize(cove.OptimizedJournalSize)))
 //
-//	//bbb.Run("optimized", bench(lcache.DBFullOptimize()))
-//	//bbb.Run("optimized sync off", bench(lcache.DBFullOptimize(), lcache.DBSyncOff()))
+//	//bbb.Run("optimized", bench(cove.DBFullOptimize()))
+//	//bbb.Run("optimized sync off", bench(cove.DBFullOptimize(), cove.DBSyncOff()))
 //
 //}

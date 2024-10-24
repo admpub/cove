@@ -1,4 +1,4 @@
-package lcache
+package cove
 
 import (
 	"database/sql"
@@ -80,7 +80,7 @@ func getValues(db query, from string, to string, tbl string) (vals [][]byte, err
 func iterKV(db query, from string, to string, tbl string) iter.Seq2[string, []byte] {
 	r, err := db.Query(fmt.Sprintf(`SELECT key, value FROM %s WHERE $1 <= key AND key <= $2`, tbl), from, to)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "lcache: could not query in iter, %v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "cove: could not query in iter, %v", err)
 		return nil
 	}
 
@@ -90,7 +90,7 @@ func iterKV(db query, from string, to string, tbl string) iter.Seq2[string, []by
 			var k, v string
 			err := r.Scan(&k, &v)
 			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "lcache: could not scan in iter, %v", err)
+				_, _ = fmt.Fprintf(os.Stderr, "cove: could not scan in iter, %v", err)
 				return
 			}
 			if !yield(k, []byte(v)) {
@@ -103,7 +103,7 @@ func iterKV(db query, from string, to string, tbl string) iter.Seq2[string, []by
 func iterKeys(db query, from string, to string, tbl string) iter.Seq[string] {
 	r, err := db.Query(fmt.Sprintf(`SELECT key FROM %s WHERE $1 <= key AND key <= $2`, tbl), from, to)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "lcache: could not query in iter, %v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "cove: could not query in iter, %v", err)
 		return nil
 	}
 
@@ -113,7 +113,7 @@ func iterKeys(db query, from string, to string, tbl string) iter.Seq[string] {
 			var k string
 			err := r.Scan(&k)
 			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "lcache: could not scan in iter, %v", err)
+				_, _ = fmt.Fprintf(os.Stderr, "cove: could not scan in iter, %v", err)
 				return
 			}
 			if !yield(k) {
@@ -126,7 +126,7 @@ func iterKeys(db query, from string, to string, tbl string) iter.Seq[string] {
 func iterValues(db query, from string, to string, tbl string) iter.Seq[[]byte] {
 	r, err := db.Query(fmt.Sprintf(`SELECT value FROM %s WHERE $1 <= key AND key <= $2`, tbl), from, to)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "lcache: could not query in iter, %v", err)
+		_, _ = fmt.Fprintf(os.Stderr, "cove: could not query in iter, %v", err)
 		return nil
 	}
 
@@ -136,7 +136,7 @@ func iterValues(db query, from string, to string, tbl string) iter.Seq[[]byte] {
 			var v string
 			err := r.Scan(&v)
 			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "lcache: could not scan in iter, %v", err)
+				_, _ = fmt.Fprintf(os.Stderr, "cove: could not scan in iter, %v", err)
 				return
 			}
 			if !yield([]byte(v)) {

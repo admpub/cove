@@ -1,21 +1,21 @@
-package lcache_test
+package cove_test
 
 import (
 	"fmt"
+	"github.com/modfin/cove"
 	"sort"
 	"strconv"
 	"testing"
 	"time"
 
-	"github.com/modfin/lcache"
 	"github.com/stretchr/testify/assert"
 )
 
-func TypedCache(t *testing.T) *lcache.TypedCache[string] {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+func TypedCache(t *testing.T) *cove.TypedCache[string] {
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	assert.NotNil(t, cache)
-	return lcache.Of[string](cache)
+	return cove.Of[string](cache)
 }
 
 type Complex struct {
@@ -26,11 +26,11 @@ type Complex struct {
 	NilErr  error
 }
 
-func TypedComplexCache(t *testing.T) *lcache.TypedCache[Complex] {
-	cache, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+func TypedComplexCache(t *testing.T) *cove.TypedCache[Complex] {
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	assert.NotNil(t, cache)
-	return lcache.Of[Complex](cache)
+	return cove.Of[Complex](cache)
 }
 
 func TestGetTypedComplexCache(t *testing.T) {
@@ -102,7 +102,7 @@ func TestSetTypedCacheValueWithTTL(t *testing.T) {
 
 	_, err = typedCache.Get(key)
 	assert.Error(t, err)
-	assert.Equal(t, lcache.NotFound, err)
+	assert.Equal(t, cove.NotFound, err)
 }
 
 func TestGetOrSetTypedCacheValue(t *testing.T) {
@@ -135,7 +135,7 @@ func TestEvictTypedCacheValue(t *testing.T) {
 
 	_, err = typedCache.Get(key)
 	assert.Error(t, err)
-	assert.Equal(t, lcache.NotFound, err)
+	assert.Equal(t, cove.NotFound, err)
 }
 
 func TestEvictAllTypedCacheValues(t *testing.T) {
@@ -158,18 +158,18 @@ func TestEvictAllTypedCacheValues(t *testing.T) {
 
 	_, err = typedCache.Get(key1)
 	assert.Error(t, err)
-	assert.Equal(t, lcache.NotFound, err)
+	assert.Equal(t, cove.NotFound, err)
 
 	_, err = typedCache.Get(key2)
 	assert.Error(t, err)
-	assert.Equal(t, lcache.NotFound, err)
+	assert.Equal(t, cove.NotFound, err)
 }
 
 func TestBatchSetTypedCacheValues(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []lcache.KVt[string]{
+	ziped := []cove.KVt[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 	}
@@ -188,7 +188,7 @@ func TestBatchGetTypedCacheValues(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []lcache.KVt[string]{
+	ziped := []cove.KVt[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 	}
@@ -211,18 +211,18 @@ func TestCacheBatchEvictTypedSizes(t *testing.T) {
 
 	do := func(itre int) func(t *testing.T) {
 		return func(t *testing.T) {
-			cc, err := lcache.New(lcache.URITemp(), lcache.DBRemoveOnClose())
+			cc, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 			assert.NoError(t, err)
 			defer cc.Close()
 
-			typed := lcache.Of[string](cc)
+			typed := cove.Of[string](cc)
 
 			var keys []string
-			var rows []lcache.KVt[string]
+			var rows []cove.KVt[string]
 			for i := 0; i < itre; i++ {
 				k := strconv.Itoa(i)
 				v := fmt.Sprintf("value_%d", i)
-				rows = append(rows, lcache.KVt[string]{K: k, V: v})
+				rows = append(rows, cove.KVt[string]{K: k, V: v})
 				keys = append(keys, k)
 				err = typed.Set(k, v)
 				assert.NoError(t, err)
@@ -247,7 +247,7 @@ func TestCacheBatchEvictTypedSizes(t *testing.T) {
 
 				_, err = typed.Get(row.K)
 				assert.Error(t, err)
-				assert.Equal(t, lcache.NotFound, err)
+				assert.Equal(t, cove.NotFound, err)
 			}
 
 		}
@@ -258,9 +258,9 @@ func TestCacheBatchEvictTypedSizes(t *testing.T) {
 	t.Run("100", do(100))
 	t.Run("101", do(101))
 
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS-1), do(lcache.MAX_PARAMS-1))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS), do(lcache.MAX_PARAMS))
-	t.Run(fmt.Sprintf("%d", lcache.MAX_PARAMS+1), do(lcache.MAX_PARAMS+1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS-1), do(cove.MAX_PARAMS-1))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS), do(cove.MAX_PARAMS))
+	t.Run(fmt.Sprintf("%d", cove.MAX_PARAMS+1), do(cove.MAX_PARAMS+1))
 
 }
 
@@ -268,7 +268,7 @@ func TestTypedCacheItrRange(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []lcache.KVt[string]{
+	ziped := []cove.KVt[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 		{K: "key3", V: "value3"},
@@ -277,9 +277,9 @@ func TestTypedCacheItrRange(t *testing.T) {
 	err := typedCache.BatchSet(ziped)
 	assert.NoError(t, err)
 
-	var result []lcache.KVt[string]
+	var result []cove.KVt[string]
 	typedCache.ItrRange("key1", "key3")(func(k string, v string) bool {
-		result = append(result, lcache.KVt[string]{K: k, V: v})
+		result = append(result, cove.KVt[string]{K: k, V: v})
 		return true
 	})
 
@@ -294,7 +294,7 @@ func TestTypedCacheItrKeys(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []lcache.KVt[string]{
+	ziped := []cove.KVt[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 		{K: "key3", V: "value3"},
@@ -318,7 +318,7 @@ func TestTypedCacheItrValues(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []lcache.KVt[string]{
+	ziped := []cove.KVt[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 		{K: "key3", V: "value3"},
@@ -342,7 +342,7 @@ func TestTypedCacheValues(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []lcache.KVt[string]{
+	ziped := []cove.KVt[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 		{K: "key3", V: "value3"},
@@ -351,7 +351,7 @@ func TestTypedCacheValues(t *testing.T) {
 	err := typedCache.BatchSet(ziped)
 	assert.NoError(t, err)
 
-	values, err := typedCache.Values("key1", lcache.RANGE_MAX)
+	values, err := typedCache.Values("key1", cove.RANGE_MAX)
 	assert.NoError(t, err)
 	sort.Strings(values)
 	expectedValues := []string{"value1", "value2", "value3"}
@@ -362,7 +362,7 @@ func TestTypedCacheKeys(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []lcache.KVt[string]{
+	ziped := []cove.KVt[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 		{K: "key3", V: "value3"},
@@ -371,7 +371,7 @@ func TestTypedCacheKeys(t *testing.T) {
 	err := typedCache.BatchSet(ziped)
 	assert.NoError(t, err)
 
-	values, err := typedCache.Keys("key1", lcache.RANGE_MAX)
+	values, err := typedCache.Keys("key1", cove.RANGE_MAX)
 	assert.NoError(t, err)
 	sort.Strings(values)
 	expectedValues := []string{"key1", "key2", "key3"}

@@ -1,4 +1,4 @@
-package lcache
+package cove
 
 import (
 	"errors"
@@ -20,10 +20,10 @@ func Vacuum(interval time.Duration, max int) func(cache *Cache) {
 				return 0
 			}
 			if cache.log != nil && n > 0 {
-				cache.log.Info("[lcache] vacuumed", "ns", ns.namespace, "time", elapsed, "n", n)
+				cache.log.Info("[cove] vacuumed", "ns", ns.namespace, "time", elapsed, "n", n)
 			}
 			if cache.log != nil && n == 0 {
-				cache.log.Debug("[lcache] vacuumed", "ns", ns.namespace, "time", elapsed, "n", n)
+				cache.log.Debug("[cove] vacuumed", "ns", ns.namespace, "time", elapsed, "n", n)
 			}
 			return n
 
@@ -34,7 +34,7 @@ func Vacuum(interval time.Duration, max int) func(cache *Cache) {
 			select {
 			case <-tic.C:
 			case <-cache.closed:
-				cache.log.Info("[lcache] vacuum stopping")
+				cache.log.Info("[cove] vacuum stopping")
 				return
 			}
 			for _, namespace := range cache.namespaces {
@@ -54,7 +54,7 @@ func Vacuum(interval time.Duration, max int) func(cache *Cache) {
 
 					select {
 					case <-cache.closed:
-						cache.log.Info("[lcache] vacuum stopping")
+						cache.log.Info("[cove] vacuum stopping")
 						return
 					default:
 					}
@@ -66,8 +66,8 @@ func Vacuum(interval time.Duration, max int) func(cache *Cache) {
 }
 
 func URITemp() string {
-	d := fmt.Sprintf("%d-lcache", time.Now().Unix())
-	uri := filepath.Join(os.TempDir(), d, "lcache.db")
+	d := fmt.Sprintf("%d-cove", time.Now().Unix())
+	uri := filepath.Join(os.TempDir(), d, "cove.db")
 	os.MkdirAll(filepath.Dir(uri), 0755)
 	return fmt.Sprintf("file:%s?tmp=true", uri)
 }
