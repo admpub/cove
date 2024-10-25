@@ -1,6 +1,6 @@
 # Cove
 
-![goreportcard.com](https://goreportcard.com/badge/github.com/modfin/cove)
+[![goreportcard.com](https://goreportcard.com/badge/github.com/modfin/cove)](https://goreportcard.com/report/github.com/modfin/cove)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/modfin/cove)](https://pkg.go.dev/github.com/modfin/cove)
 
 
