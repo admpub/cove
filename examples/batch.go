@@ -26,20 +26,22 @@ func main() {
 	assertNoErr(err)
 	defer cache.Close()
 
-	err = cache.BatchSet([]cove.KV[[]byte]{
-		{K: "key1", V: []byte("val1")},
-		{K: "key2", V: []byte("val2")},
-	})
+	// Helper functions to construct []KV[[]byte] slice
+	KeyValueSet := cove.Zip(
+		[]string{"key1", "key2"},
+		[][]byte{[]byte("val1"), []byte("val2")})
+
+	err = cache.BatchSet(KeyValueSet)
 	assertNoErr(err)
 
 	kvs, err := cache.BatchGet([]string{"key1", "key2", "key3"})
 	assertNoErr(err)
 
 	for _, kv := range kvs {
-		fmt.Println(kv.K, "-", string(kv.V))
+		fmt.Println(kv.Unzip())
 		// output:
-		//  key1 - val1
-		//  key2 - val2
+		//  key1 [118 97 108 49]
+		//  key2 [118 97 108 50]
 	}
 
 	evicted, err := cache.BatchEvict([]string{"key1", "key2", "key3"})
@@ -48,8 +50,11 @@ func main() {
 	//  Callback, key key1 was evicted
 	//  Callback, key key2 was evicted
 
-	for _, kv := range evicted {
-		fmt.Println("Evicted,", kv.K, "-", string(kv.V))
+	// Helper function to unzip []KV[[]byte] to k/v slices
+	evictedKeys, evictedVals := cove.Unzip(evicted)
+
+	for i, key := range evictedKeys {
+		fmt.Println("Evicted,", key, "-", string(evictedVals[i]))
 		// output:
 		//  Evicted, key1 - val1
 		//  Evicted, key2 - val2

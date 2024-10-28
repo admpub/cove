@@ -285,7 +285,7 @@ func TestCacheRange(t *testing.T) {
 	defer cache.Close()
 
 	// Set some key-value pairs in the cache
-	pairs := []cove.KV{
+	pairs := []cove.KV[[]byte]{
 		{"key1", []byte("value1")},
 		{"key2", []byte("value2")},
 		{"key3:and:more", []byte("value3")},
@@ -294,7 +294,7 @@ func TestCacheRange(t *testing.T) {
 		{"key6", []byte("value6")},
 	}
 
-	exp := []cove.KV{
+	exp := []cove.KV[[]byte]{
 		{"key2", []byte("value2")},
 		{"key3:and:more", []byte("value3")},
 		{"key4", []byte("value4")},
@@ -326,7 +326,7 @@ func TestCacheIter(t *testing.T) {
 	defer cache.Close()
 
 	// Set some key-value pairs in the cache
-	pairs := []cove.KV{
+	pairs := []cove.KV[[]byte]{
 		{"key1", []byte("value1")},
 		{"key2", []byte("value2")},
 		{"key3:and:more", []byte("value3")},
@@ -335,7 +335,7 @@ func TestCacheIter(t *testing.T) {
 		{"key7", []byte("value6")},
 	}
 
-	exp := []cove.KV{
+	exp := []cove.KV[[]byte]{
 		{"key2", []byte("value2")},
 		{"key3:and:more", []byte("value3")},
 		{"key4", []byte("value4")},
@@ -346,10 +346,10 @@ func TestCacheIter(t *testing.T) {
 		assert.NoError(t, err)
 	}
 
-	var res []cove.KV
+	var res []cove.KV[[]byte]
 
 	for k, v := range cache.ItrRange("key2", "key4") {
-		res = append(res, cove.KV{
+		res = append(res, cove.KV[[]byte]{
 			K: k,
 			V: v,
 		})
@@ -416,9 +416,9 @@ func TestCacheBatchSetSizes(t *testing.T) {
 			assert.NoError(t, err)
 			defer cache.Close()
 
-			var rows []cove.KV
+			var rows []cove.KV[[]byte]
 			for i := 0; i < itre; i++ {
-				rows = append(rows, cove.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))})
+				rows = append(rows, cove.KV[[]byte]{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))})
 			}
 
 			err = cache.BatchSet(rows)
@@ -460,9 +460,9 @@ func TestCacheBatchGetSizes(t *testing.T) {
 			defer cache.Close()
 
 			var keys []string
-			var rows []cove.KV
+			var rows []cove.KV[[]byte]
 			for i := 0; i < itre; i++ {
-				kv := cove.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
+				kv := cove.KV[[]byte]{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
 				rows = append(rows, kv)
 				keys = append(keys, kv.K)
 				err = cache.Set(kv.K, kv.V)
@@ -515,7 +515,7 @@ func TestCacheBatchEvictSizes(t *testing.T) {
 	do := func(itre int) func(t *testing.T) {
 		return func(t *testing.T) {
 
-			var evicted []cove.KV
+			var evicted []cove.KV[[]byte]
 			var mu sync.Mutex
 			wgEvicted := sync.WaitGroup{}
 			wgEvicted.Add(itre)
@@ -525,16 +525,16 @@ func TestCacheBatchEvictSizes(t *testing.T) {
 					mu.Lock()
 					defer mu.Unlock()
 					defer wgEvicted.Done()
-					evicted = append(evicted, cove.KV{K: k, V: v})
+					evicted = append(evicted, cove.KV[[]byte]{K: k, V: v})
 				}),
 			)
 			assert.NoError(t, err)
 			defer cache.Close()
 
 			var keys []string
-			var rows []cove.KV
+			var rows []cove.KV[[]byte]
 			for i := 0; i < itre; i++ {
-				kv := cove.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
+				kv := cove.KV[[]byte]{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
 				rows = append(rows, kv)
 				keys = append(keys, kv.K)
 				err = cache.Set(kv.K, kv.V)
@@ -596,7 +596,7 @@ func TestCacheBatchSet(t *testing.T) {
 	assert.NoError(t, err)
 	defer cache.Close()
 
-	rows := []cove.KV{
+	rows := []cove.KV[[]byte]{
 		{K: "key1", V: []byte("value1")},
 		{K: "key2", V: []byte("value2")},
 		{K: "key3", V: []byte("value3")},
@@ -617,7 +617,7 @@ func TestCacheBatchGet(t *testing.T) {
 	assert.NoError(t, err)
 	defer cache.Close()
 
-	rows := []cove.KV{
+	rows := []cove.KV[[]byte]{
 		{K: "key1", V: []byte("value1")},
 		{K: "key2", V: []byte("value2")},
 		{K: "key3", V: []byte("value3")},
@@ -642,7 +642,7 @@ func TestCacheVacuum(t *testing.T) {
 	do := func(itre int) func(t *testing.T) {
 		return func(t *testing.T) {
 
-			var evicted []cove.KV
+			var evicted []cove.KV[[]byte]
 			var mu sync.Mutex
 			wgEvicted := sync.WaitGroup{}
 			wgEvicted.Add(itre)
@@ -659,15 +659,15 @@ func TestCacheVacuum(t *testing.T) {
 					mu.Lock()
 					defer mu.Unlock()
 					defer wgEvicted.Done()
-					evicted = append(evicted, cove.KV{K: k, V: v})
+					evicted = append(evicted, cove.KV[[]byte]{K: k, V: v})
 				}),
 			)
 			assert.NoError(t, err)
 			defer cache.Close()
 
-			var rows []cove.KV
+			var rows []cove.KV[[]byte]
 			for i := 0; i < itre; i++ {
-				kv := cove.KV{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
+				kv := cove.KV[[]byte]{K: strconv.Itoa(i), V: []byte(fmt.Sprintf("value_%d", i))}
 				rows = append(rows, kv)
 			}
 
