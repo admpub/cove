@@ -67,25 +67,31 @@ func main() {
 
 
 ## Use case
-cove is meant to be embedded into your application, and not as a standalone service. It is a simple key-value store that is meant to be used for caching data that is expensive to compute or retrieve. 
-
+`cove` is meant to be embedded into your application, and not as a standalone service. 
+It is a simple key-value store that is meant to be used for caching data that is expensive to compute or retrieve. 
 `cove` can also be used as a key-value store
 
 So why SQLite?
 
-There are plenty of in memory and other caches build in go, eg https://github.com/avelino/awesome-go#cache, performance, concurrency, fast, LFU, LRU, ARC and so on.
-There are also a few key-value stores build in go that can be embedded (just like cove), eg https://github.com/dgraph-io/badger or https://github.com/boltdb/bolt and probably quite a few more, https://github.com/avelino/awesome-go#databases-implemented-in-go.
+There are plenty of in memory and other caches build in go, \
+eg https://github.com/avelino/awesome-go#cache, performance, concurrency, fast, LFU, LRU, ARC and so on. \
+There are also a few key-value stores build in go that can be embedded (just like cove), \
+eg https://github.com/dgraph-io/badger or https://github.com/boltdb/bolt and probably quite a few more, \
+https://github.com/avelino/awesome-go#databases-implemented-in-go.
 
 Well if these alternatives suits your use case, use them. 
-The main benefit of using a cache/kv, from my perspective and the reason for building cove, is that a cache backed by sqlite should be decent in most use case. 
-Its generically just a good solution while probably being outperformed in most niche cases.
+The main benefit of using a cache/kv, from my perspective and the reason for building cove, is that a cache backed by sqlite should be decent 
+and fast enough in most case. 
+Its generically just a good solution while probably being outperformed by others in niche cases.
 - you can have very large K/V pairs
 - you can tune it for your use case
 - it should perform decently
 - you can cache hundreds of GB. SSD are fast these days.
 - page caching and tuning will help you out.
 
-While sqlite has come a long way since its inception and particular with it running in WAL mode, there are some limitations. Eg only one writer is allowed at a time. So if you have a write heavy cache, you might want to consider another solution. With that said it should be fine for most some tuning can be done to increase write performance, eg `synchronous = off`.
+While sqlite has come a long way since its inception and particular with it running in WAL mode, there are some limitations.
+Eg only one writer is allowed at a time. So if you have a write heavy cache, you might want to consider another solution. 
+With that said it should be fine for most with some tuning to increase write performance, eg `synchronous = off`.
 
 ## Installation
 
@@ -118,7 +124,11 @@ Have a look at https://www.sqlite.org/pragma.html for tuning your cache to your 
 If you are write heavy, you might want to consider `synchronous = off` and dabble with some other settings, eg `wal_autocheckpoint`, to increase write performance. The tradeoff is that you might lose some read performance instead.
 
 ```go
-    cache, err := cove.New(cove.URITemp(), cove.DBSyncOff(), cove.DBPragma("wal_autocheckpoint = 1000"))
+    cache, err := cove.New(
+		cove.URITemp(), 
+		cove.DBSyncOff(), 
+		cove.DBPragma("wal_autocheckpoint = 1000"),
+    )
 ```
 
 
@@ -195,7 +205,8 @@ func main() {
         panic(err)
     }
 
-    fmt.Println("[Hit]:", hit, "[Value]:", string(value)) // Output: "[Hit]: true [Value]: value0
+    fmt.Println("[Hit]:", hit, "[Value]:", string(value)) 
+	// Output: "[Hit]: true [Value]: value0
 }
 ```
 
