@@ -635,8 +635,8 @@ The `TypedCache` uses `encoding/gob` for serialization and deserialization of va
 
 ## Benchmarks
 
-All models are wrong but some are useful. Not sure where what category this falls under,
-but here are some benchmarks` inserts/sec`, `reads/sec`, `write mb/sec` and `read mb/sec`.
+All models are wrong but some are useful. Not sure what category this falls under,
+but here are some benchmarks `inserts/sec`, `reads/sec`, `write mb/sec` and `read mb/sec`.
 
 In general Linux, 4 cores, a ssd and 32 gb of ram it seems to do some 
 - 20-30k inserts/sec
@@ -644,7 +644,7 @@ In general Linux, 4 cores, a ssd and 32 gb of ram it seems to do some
 - writes 100-200 mb/sec
 - reads 1000-2000 mb/sec. 
 
-It seems fast enough for me.
+It seems fast enough...
 
 ```txt 
  

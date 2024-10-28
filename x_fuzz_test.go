@@ -8,7 +8,7 @@ import (
 )
 
 // Since we are stepping on eachother with keys, use parallel=1
-// go test -v -fuzz=. -run="^#" -parallel=1
+// go test -v -fuzz=. -run="^#" -parallel=1 -fuzztime 30s
 func FuzzGetSet(f *testing.F) {
 
 	testcases := []cove.KV[string]{
@@ -22,6 +22,9 @@ func FuzzGetSet(f *testing.F) {
 		{K: "", V: string([]byte{0xff, 0x7f})},
 		{K: string(rune(0)), V: string([]byte{0})},
 		{K: string(rune(255)), V: string([]byte{255})},
+		{K: "a", V: "1\x12\xd78{"},
+		{K: "b", V: "\xff\x7f"},
+		{"\xff\x7f\xff\xff\xaa\b", "10"},
 	}
 	for _, tc := range testcases {
 		f.Add(tc.K, []byte(tc.V)) // Use f.Add to provide a seed corpus

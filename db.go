@@ -34,12 +34,13 @@ func getRange(db query, from string, to string, tbl string) (kv []KV[[]byte], er
 	}
 	defer r.Close()
 	for r.Next() {
-		var k, v string
+		var k string
+		var v []byte
 		err := r.Scan(&k, &v)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan in range, %w", err)
 		}
-		kv = append(kv, KV[[]byte]{K: k, V: []byte(v)})
+		kv = append(kv, KV[[]byte]{K: k, V: v})
 	}
 	return kv, nil
 }
@@ -68,12 +69,12 @@ func getValues(db query, from string, to string, tbl string) (vals [][]byte, err
 	}
 	defer r.Close()
 	for r.Next() {
-		var v string
+		var v []byte
 		err := r.Scan(&v)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan in range, %w", err)
 		}
-		vals = append(vals, []byte(v))
+		vals = append(vals, v)
 	}
 	return vals, nil
 }
@@ -91,7 +92,8 @@ func iterKV(db query, from string, to string, tbl string, log *slog.Logger) iter
 	return func(yield func(string, []byte) bool) {
 		defer r.Close()
 		for r.Next() {
-			var k, v string
+			var k string
+			var v []byte
 			err := r.Scan(&k, &v)
 			if err != nil {
 				if log != nil {
@@ -101,7 +103,7 @@ func iterKV(db query, from string, to string, tbl string, log *slog.Logger) iter
 				_, _ = fmt.Fprintf(os.Stderr, "cove: iterKV, could not scan in iter, %v", err)
 				return
 			}
-			if !yield(k, []byte(v)) {
+			if !yield(k, v) {
 				return
 			}
 		}
@@ -201,15 +203,11 @@ func evict(r query, key string, tbl string) (KV[[]byte], error) {
 
 func get(r query, key string, tbl string) ([]byte, error) {
 
-	do := func() ([]byte, error) {
-		var value []byte
-		err := r.QueryRow(fmt.Sprintf(`
+	var value []byte
+	err := r.QueryRow(fmt.Sprintf(`
 		SELECT value FROM %s 
 		WHERE key = $1 AND strftime('%%s', 'now') < expire_at
 	`, tbl), key).Scan(&value)
-		return value, err
-	}
-	value, err := do()
 
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, NotFound
@@ -221,9 +219,11 @@ func get(r query, key string, tbl string) ([]byte, error) {
 }
 
 func setTTL(r query, key string, value []byte, ttl time.Duration, tbl string) error {
+	if value == nil {
+		value = []byte{}
+	}
 
-	do := func() error {
-		_, err := r.Exec(fmt.Sprintf(`
+	_, err := r.Exec(fmt.Sprintf(`
 		INSERT INTO %s (key, value, expire_at, ttl) 
 		VALUES ($1, $2, strftime('%%s', 'now')+$3, $3)
 		ON CONFLICT (key)
@@ -233,11 +233,7 @@ func setTTL(r query, key string, value []byte, ttl time.Duration, tbl string) er
 			  create_at =  excluded.create_at, 
 			  expire_at = excluded.expire_at, 
 			  ttl =  excluded.ttl
-	`, tbl), key, string(value), int(ttl.Seconds()))
-		return err
-	}
-
-	err := do()
+	`, tbl), key, value, int(ttl.Seconds()))
 
 	if err != nil {
 		return fmt.Errorf("could not exec, %w", err)
@@ -266,13 +262,13 @@ func batchGet(db query, keys []string, tbl string) ([]KV[[]byte], error) {
 	defer rows.Close()
 	var kvs []KV[[]byte]
 	for rows.Next() {
-		var key string
-		var value string
-		err := rows.Scan(&key, &value)
+		var k string
+		var v []byte
+		err := rows.Scan(&k, &v)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan, %w", err)
 		}
-		kvs = append(kvs, KV[[]byte]{K: key, V: []byte(value)})
+		kvs = append(kvs, KV[[]byte]{K: k, V: v})
 	}
 	return kvs, nil
 }
@@ -284,7 +280,7 @@ func batchSet(db query, rows []KV[[]byte], ttl time.Duration, tbl string) error 
 
 	for i, kv := range rows {
 		values = append(values, fmt.Sprintf("($%d, $%d, strftime('%%s', 'now')+$%d, $%d)", i*3+1, i*3+2, i*3+3, i*3+3))
-		params = append(params, kv.K, string(kv.V), int(ttl.Seconds()))
+		params = append(params, kv.K, kv.V, int(ttl.Seconds()))
 	}
 
 	q := fmt.Sprintf(`
@@ -324,13 +320,13 @@ func batchEvict(r query, keys []string, tbl string) ([]KV[[]byte], error) {
 	defer rows.Close()
 	var kvs []KV[[]byte]
 	for rows.Next() {
-		var key string
-		var value string
-		err := rows.Scan(&key, &value)
+		var k string
+		var v []byte
+		err := rows.Scan(&k, &v)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan, %w", err)
 		}
-		kvs = append(kvs, KV[[]byte]{K: key, V: []byte(value)})
+		kvs = append(kvs, KV[[]byte]{K: k, V: v})
 	}
 
 	return kvs, nil
@@ -367,13 +363,13 @@ func vacuum(r query, max int, tbl string) ([]KV[[]byte], error) {
 	defer rows.Close()
 	var kvs []KV[[]byte]
 	for rows.Next() {
-		var key string
-		var value string
-		err := rows.Scan(&key, &value)
+		var k string
+		var v []byte
+		err := rows.Scan(&k, &v)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan, %w", err)
 		}
-		kvs = append(kvs, KV[[]byte]{K: key, V: []byte(value)})
+		kvs = append(kvs, KV[[]byte]{K: k, V: v})
 	}
 	return kvs, nil
 }
