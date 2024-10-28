@@ -127,6 +127,8 @@ If you are write heavy, you might want to consider `synchronous = off` and dabbl
     cache, err := cove.New(
 		cove.URITemp(), 
 		cove.DBSyncOff(), 
+		// Yes, yes, this can be used to inject sql, but I trust you
+		// to not let your users arbitrarily configure pragma on your sqlite instance.
 		cove.DBPragma("wal_autocheckpoint = 1000"),
     )
 ```
