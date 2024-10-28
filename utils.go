@@ -20,7 +20,7 @@ func Vacuum(interval time.Duration, max int) func(cache *Cache) {
 				return 0
 			}
 			if cache.log != nil && n > 0 {
-				cache.log.Info("[cove] vacuumed", "ns", ns.namespace, "time", elapsed, "n", n)
+				cache.log.Debug("[cove] vacuumed", "ns", ns.namespace, "time", elapsed, "n", n)
 			}
 			if cache.log != nil && n == 0 {
 				cache.log.Debug("[cove] vacuumed", "ns", ns.namespace, "time", elapsed, "n", n)
@@ -73,6 +73,7 @@ func URITemp() string {
 }
 
 func URIFromPath(path string) string {
+	_ = os.MkdirAll(filepath.Dir(path), 0755)
 	return fmt.Sprintf("file:%s", path)
 }
 

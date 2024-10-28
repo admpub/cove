@@ -3,6 +3,7 @@ package cove_test
 import (
 	"fmt"
 	"github.com/modfin/cove"
+	"log/slog"
 	"sort"
 	"strconv"
 	"sync"
@@ -13,15 +14,19 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func init() {
+	//slog.SetLogLoggerLevel(slog.LevelDebug)
+}
+
 func TestNewCacheWithTempUri(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	assert.NotNil(t, cache)
 	defer cache.Close()
 }
 
 func TestCacheSetAndGet(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -39,7 +44,7 @@ func TestCacheSetAndGet(t *testing.T) {
 func TestCacheSetAndGetSize(t *testing.T) {
 	do := func(size int) func(t *testing.T) {
 		return func(t *testing.T) {
-			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 			assert.NoError(t, err)
 			defer cache.Close()
 
@@ -72,7 +77,7 @@ func TestCacheSetAndGetSize(t *testing.T) {
 }
 
 func TestCacheSetGetEmpty(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -88,7 +93,7 @@ func TestCacheSetGetEmpty(t *testing.T) {
 }
 
 func TestCacheSetGetNil(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -104,7 +109,7 @@ func TestCacheSetGetNil(t *testing.T) {
 }
 
 func TestCacheGetOrSet(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -119,7 +124,7 @@ func TestCacheGetOrSet(t *testing.T) {
 }
 
 func TestCacheGetOrSetParallel(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -150,7 +155,7 @@ func TestCacheGetOrSetParallel(t *testing.T) {
 }
 
 func TestCacheGetOrSetParallelMem(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -181,7 +186,7 @@ func TestCacheGetOrSetParallelMem(t *testing.T) {
 }
 
 func TestCacheEvict(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -201,7 +206,7 @@ func TestCacheEvict(t *testing.T) {
 }
 
 func TestCacheSetTTL(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -220,7 +225,7 @@ func TestCacheSetTTL(t *testing.T) {
 }
 
 func TestCache_Range(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -242,7 +247,7 @@ func TestCache_Range(t *testing.T) {
 }
 
 func TestCache_Keys(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -261,7 +266,7 @@ func TestCache_Keys(t *testing.T) {
 }
 
 func TestCache_Values(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -280,7 +285,7 @@ func TestCache_Values(t *testing.T) {
 }
 
 func TestCacheRange(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -321,7 +326,7 @@ func TestCacheRange(t *testing.T) {
 }
 
 func TestCacheIter(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -372,7 +377,7 @@ func TestCacheIter(t *testing.T) {
 }
 
 func TestNS(t *testing.T) {
-	c1, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	c1, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer c1.Close()
 
@@ -412,7 +417,7 @@ func TestCacheBatchSetSizes(t *testing.T) {
 
 	do := func(itre int) func(t *testing.T) {
 		return func(t *testing.T) {
-			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 			assert.NoError(t, err)
 			defer cache.Close()
 
@@ -455,7 +460,7 @@ func TestCacheBatchGetSizes(t *testing.T) {
 
 	do := func(itre int) func(t *testing.T) {
 		return func(t *testing.T) {
-			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 			assert.NoError(t, err)
 			defer cache.Close()
 
@@ -520,7 +525,7 @@ func TestCacheBatchEvictSizes(t *testing.T) {
 			wgEvicted := sync.WaitGroup{}
 			wgEvicted.Add(itre)
 
-			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(),
+			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()),
 				cove.WithEvictCallback(func(k string, v []byte) {
 					mu.Lock()
 					defer mu.Unlock()
@@ -592,7 +597,7 @@ func TestCacheBatchEvictSizes(t *testing.T) {
 }
 
 func TestCacheBatchSet(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -613,7 +618,7 @@ func TestCacheBatchSet(t *testing.T) {
 }
 
 func TestCacheBatchGet(t *testing.T) {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 	assert.NoError(t, err)
 	defer cache.Close()
 
@@ -652,6 +657,7 @@ func TestCacheVacuum(t *testing.T) {
 			cache, err := cove.New(
 				cove.URITemp(),
 				cove.DBRemoveOnClose(),
+				cove.WithLogger(slog.Default()),
 				cove.WithTTL(ttl),
 				//cove.WithLogger(slog.Default()),
 				cove.WithVacuum(cove.Vacuum(100*time.Millisecond, 1000)),
@@ -698,9 +704,82 @@ func TestCacheVacuum(t *testing.T) {
 	//t.Run("1_000_000", do(1_000_000))
 }
 
+func TestSpecific1(t *testing.T) { // from fuzz
+	cache, err := cove.New(
+		cove.URITemp(),
+		cove.DBRemoveOnClose())
+	assert.NoError(t, err)
+	defer cache.Close()
+
+	vv1 := []byte{0x31, 0x12, 0xd7, 0x38, 0x7b}
+	vv2 := []byte{0x32, 0xc9, 0x42, 0x47, 0x7, 0x93}
+	err = cache.Set("key1", vv1)
+	assert.NoError(t, err)
+	err = cache.Set("key2", vv2)
+	assert.NoError(t, err)
+
+	v1, err := cache.Get("key1")
+	assert.NoError(t, err)
+	assert.Equal(t, vv1, v1)
+	v2, err := cache.Get("key2")
+	assert.NoError(t, err)
+	assert.Equal(t, vv2, v2)
+}
+func TestSpecific2(t *testing.T) { // from fuzz
+	cache, err := cove.New(
+		cove.URITemp(),
+		cove.DBRemoveOnClose())
+	assert.NoError(t, err)
+	defer cache.Close()
+
+	kk1 := string("\x80")
+	vv1 := []byte("2")
+	err = cache.Set(kk1, vv1)
+	assert.NoError(t, err)
+
+	v1, err := cache.Get(kk1)
+	assert.NoError(t, err)
+	assert.Equal(t, vv1, v1)
+
+	kk1 = string(rune(0x80))
+	vv1 = []byte("3")
+	err = cache.Set(kk1, vv1)
+	assert.NoError(t, err)
+
+	v1, err = cache.Get(kk1)
+	assert.NoError(t, err)
+	assert.Equal(t, vv1, v1)
+
+	kk1 = string([]byte{0x80})
+	vv1 = []byte("4")
+	err = cache.Set(kk1, vv1)
+	assert.NoError(t, err)
+
+	v1, err = cache.Get(kk1)
+	assert.NoError(t, err)
+	assert.Equal(t, vv1, v1)
+}
+
+func TestSpecific3(t *testing.T) { // from fuzz
+	cache, err := cove.New(
+		cove.URITemp(),
+		cove.DBRemoveOnClose())
+	assert.NoError(t, err)
+	defer cache.Close()
+
+	kk1 := string("")
+	vv1 := []byte("\xcd\x00\x14=8E\xbf\x9b\x9e\x81\x0e2\xe7\x17\x10\x94ݿ\xadbT\x92\x9c/\xa8\x8f(\xf07gl\xae\x00J)\x97'\xe5")
+	err = cache.Set(kk1, vv1)
+	assert.NoError(t, err)
+
+	v1, err := cache.Get(kk1)
+	assert.NoError(t, err)
+	assert.Equal(t, vv1, v1)
+}
+
 //
 //func BenchmarkCacheSet(b *testing.B) {
-//	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+//	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 //	assert.NoError(b, err)
 //	defer cache.Close()
 //
@@ -719,7 +798,7 @@ func TestCacheVacuum(t *testing.T) {
 //}
 //
 //func BenchmarkCacheGet(b *testing.B) {
-//	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+//	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
 //	assert.NoError(b, err)
 //	defer cache.Close()
 //
@@ -740,7 +819,7 @@ func TestCacheVacuum(t *testing.T) {
 //
 //	bench := func(op ...cove.Op) func(*testing.B) {
 //		return func(b *testing.B) {
-//			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), op...)
+//			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), op..., cove.WithLogger(slog.Default()))
 //			assert.NoError(b, err)
 //			defer cache.Close()
 //
@@ -781,7 +860,7 @@ func TestCacheVacuum(t *testing.T) {
 //
 //	bench := func(op ...cove.Op) func(*testing.B) {
 //		return func(b *testing.B) {
-//			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), op...)
+//			cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), op..., cove.WithLogger(slog.Default()))
 //			assert.NoError(b, err)
 //			defer cache.Close()
 //

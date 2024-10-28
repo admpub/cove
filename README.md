@@ -128,7 +128,8 @@ If you are write heavy, you might want to consider `synchronous = off` and dabbl
 		cove.URITemp(), 
 		cove.DBSyncOff(), 
 		// Yes, yes, this can be used to inject sql, but I trust you
-		// to not let your users arbitrarily configure pragma on your sqlite instance.
+		// to not let your users arbitrarily configure pragma on your 
+		// sqlite instance.
 		cove.DBPragma("wal_autocheckpoint = 1000"),
     )
 ```
@@ -628,6 +629,54 @@ func main() {
 - **Raw**: Returns the underlying untyped cache.
 
 The `TypedCache` uses `encoding/gob` for serialization and deserialization of values, ensuring type safety and ease of use.
+
+
+
+
+## Benchmarks
+
+All models are wrong but some are useful. Not sure where what category this falls under,
+but here are some benchmarks` inserts/sec`, `reads/sec`, `write mb/sec` and `read mb/sec`.
+
+In general Linux, 4 cores, a ssd and 32 gb of ram it seems to do some 
+- 20-30k inserts/sec
+- 200k reads/sec.
+- writes 100-200 mb/sec
+- reads 1000-2000 mb/sec. 
+
+It seems fast enough for me.
+
+```txt 
+ 
+BenchmarkSetParallel/default-4                         28_256 insert/sec
+BenchmarkSetParallel/sync-off-4                        36_523 insert/sec
+BenchmarkSetParallel/sync-off+autocheckpoint-4         25_480 insert/sec
+
+BenchmarkGetParallel/default-4                        192_668 reads/sec
+BenchmarkGetParallel/sync-off-4                       238_714 reads/sec
+BenchmarkGetParallel/sync-off+autocheckpoint-4        193_778 reads/sec
+
+BenchmarkSetMemParallel/default+0.1mb-4                   273 write-mb/sec
+BenchmarkSetMemParallel/default+1mb-4                     261 write-mb/sec
+BenchmarkSetMemParallel/sync-off+0.1mb-4                  238 write-mb/sec
+BenchmarkSetMemParallel/sync-off+1mb-4                    212 write-mb/sec
+
+BenchmarkSetMem/default+0.1mb-4                           104 write-mb/sec
+BenchmarkSetMem/default+1mb-4                             122 write-mb/sec
+BenchmarkSetMem/sync-off+0.1mb-4                          219 write-mb/sec
+BenchmarkSetMem/sync-off+1mb-4                            249 write-mb/sec
+
+BenchmarkGetMemParallel/default+0.1mb-4                2_189 read-mb/sec
+BenchmarkGetMemParallel/default+1mb-4                  1_566 read-mb/sec
+BenchmarkGetMemParallel/sync-off+0.1mb-4               2_194 read-mb/sec
+BenchmarkGetMemParallel/sync-off+1mb-4                 1_501 read-mb/sec
+
+BenchmarkGetMem/default+0.1mb-4                          764 read-mb/sec
+BenchmarkGetMem/default+1mb-4                            520 read-mb/sec
+BenchmarkGetMem/sync-off+0.1mb-4                         719 read-mb/sec
+BenchmarkGetMem/sync-off+1mb-4                           530 read-mb/sec
+
+```
 
 
 

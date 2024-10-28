@@ -74,7 +74,6 @@ func dbDefault() Op {
 			dbPragma("journal_mode = WAL")(c),
 			dbPragma("synchronous = normal")(c),
 			dbPragma(`auto_vacuum = incremental`)(c),
-			dbPragma(`temp_store = memory`)(c),
 			dbPragma(`incremental_vacuum`)(c),
 		)
 	}
@@ -142,14 +141,15 @@ func New(uri string, op ...Op) (*Cache, error) {
 		ttl: NO_TTL,
 
 		onEvict: nil,
-		vacuum:  nil,
+
+		vacuum: Vacuum(5*time.Minute, 1_000), // default vacuum
 
 		namespace:  NS_DEFAULT,
 		namespaces: make(map[string]*Cache),
 		mu:         &sync.Mutex{},
 		muKey:      keyedMu(),
 		db:         db,
-		log:        slog.New(discardLogger{}),
+		log:        slog.New(discardLogger{}).With("uri", uri),
 
 		closeOnce:     &sync.Once{},
 		closed:        make(chan struct{}),
@@ -161,23 +161,28 @@ func New(uri string, op ...Op) (*Cache, error) {
 
 	ops := append([]Op{dbDefault()}, op...)
 
+	c.log.Debug("[cove] applying options")
 	for _, op := range ops {
 		err := op(c)
 		if err != nil {
 			return nil, fmt.Errorf("could not exec op, %w", err)
 		}
 	}
+
+	c.log.Debug("[cove] creating schema")
 	err = schema(c)
 	if err != nil {
 		return nil, fmt.Errorf("failed in creating schema, %w", err)
 	}
 
+	c.log.Debug("[cove] optimizing database")
 	err = optimize(c)
 	if err != nil {
 		return nil, fmt.Errorf("failed in optimizing, %w", err)
 	}
 
 	if c.vacuum != nil {
+		c.log.Debug("[cove] starting vacuum")
 		go c.vacuum(c)
 	}
 
@@ -214,16 +219,18 @@ func (c *Cache) NS(ns string, ops ...Op) (*Cache, error) {
 		closeOnce:     c.closeOnce,
 		closed:        c.closed,
 		removeOnClose: c.removeOnClose,
-		log:           c.log,
+		log:           c.log.With("ns", ns),
 	}
 
 	nc.namespaces[nc.namespace] = nc
 
+	nc.log.Debug("[cove] creating schema")
 	err := schema(nc)
 	if err != nil {
 		return nil, fmt.Errorf("could not create schema for namespace, %w", err)
 	}
 
+	nc.log.Debug("[cove] applying options")
 	for _, op := range ops {
 		err = op(c)
 		if err != nil {
@@ -289,13 +296,15 @@ func (c *Cache) removeStore() error {
 
 	file, query, _ := strings.Cut(uri, "?")
 
+	c.log.Info("[cove] remove store", "db", file, "shm", fmt.Sprintf("%s-shm", file), "wal", fmt.Sprintf("%s-wal", file))
+
 	err := errors.Join(
 		os.Remove(file),
 		os.Remove(fmt.Sprintf("%s-shm", file)),
 		os.Remove(fmt.Sprintf("%s-wal", file)),
 	)
-
 	if strings.Contains(query, "tmp=true") {
+		c.log.Info("[cove] remove store dir", "dir", filepath.Dir(file))
 		err = errors.Join(os.Remove(filepath.Dir(file)), err)
 	}
 
@@ -336,6 +345,8 @@ func (c *Cache) GetOr(key string, fetch func(k string) ([]byte, error)) ([]byte,
 		if err == nil {
 			return value, nil
 		}
+
+		c.log.Debug("[cove] cache miss fetching value, using fetcher", "key", key)
 
 		value, err = fetch(key)
 		if err != nil {
@@ -531,7 +542,7 @@ func (c *Cache) Values(from string, to string) (values [][]byte, err error) {
 //	the Con is that errors are dropped when using iterators.
 //	the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
 func (c *Cache) ItrRange(from string, to string) iter.Seq2[string, []byte] {
-	return iterKV(c.db, from, to, c.tbl())
+	return iterKV(c.db, from, to, c.tbl(), c.log)
 }
 
 // ItrKeys returns an iterator for the range of keys [from, to]
@@ -541,7 +552,7 @@ func (c *Cache) ItrRange(from string, to string) iter.Seq2[string, []byte] {
 //	the Con is that errors are dropped when using iterators.
 //	the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
 func (c *Cache) ItrKeys(from string, to string) iter.Seq[string] {
-	return iterKeys(c.db, from, to, c.tbl())
+	return iterKeys(c.db, from, to, c.tbl(), c.log)
 }
 
 // ItrValues returns an iterator for the range of values [from, to]
@@ -551,11 +562,12 @@ func (c *Cache) ItrKeys(from string, to string) iter.Seq[string] {
 //	the Con is that errors are dropped when using iterators.
 //	the Pro is that it is very easy to use, and scan row by row (ie. no need to load all rows into memory)
 func (c *Cache) ItrValues(from string, to string) iter.Seq[[]byte] {
-	return iterValues(c.db, from, to, c.tbl())
+	return iterValues(c.db, from, to, c.tbl(), c.log)
 }
 
 func (c *Cache) Vacuum(max int) (n int, err error) {
 
+	c.log.Debug("[cove] vacuuming namespace", "max_eviction", max)
 	if c.onEvict == nil { // Dont do expensive vacuum if no onEvict is set
 		return vacuumNoResult(c.db, max, c.tbl())
 	}
@@ -566,6 +578,7 @@ func (c *Cache) Vacuum(max int) (n int, err error) {
 	}
 
 	if c.onEvict != nil {
+		c.log.Debug("[cove] calling onEvict callback", "evicted", len(kvs))
 		for _, kv := range kvs {
 			k := kv.K
 			v := kv.V

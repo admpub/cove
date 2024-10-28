@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"log/slog"
 	"os"
 	"strings"
 	"time"
@@ -77,11 +78,14 @@ func getValues(db query, from string, to string, tbl string) (vals [][]byte, err
 	return vals, nil
 }
 
-func iterKV(db query, from string, to string, tbl string) iter.Seq2[string, []byte] {
+func iterKV(db query, from string, to string, tbl string, log *slog.Logger) iter.Seq2[string, []byte] {
 	r, err := db.Query(fmt.Sprintf(`SELECT key, value FROM %s WHERE $1 <= key AND key <= $2`, tbl), from, to)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "cove: could not query in iter, %v", err)
-		return nil
+		if log != nil {
+			log.Error("[cove] iterKV, could not query in iter", "err", err)
+			return nil
+		}
+		_, _ = fmt.Fprintf(os.Stderr, "[cove] iterKV, could not query in iter, %v", err)
 	}
 
 	return func(yield func(string, []byte) bool) {
@@ -90,7 +94,11 @@ func iterKV(db query, from string, to string, tbl string) iter.Seq2[string, []by
 			var k, v string
 			err := r.Scan(&k, &v)
 			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "cove: could not scan in iter, %v", err)
+				if log != nil {
+					log.Error("[cove] iterKV, could not scan in iter,", "err", err)
+					return
+				}
+				_, _ = fmt.Fprintf(os.Stderr, "cove: iterKV, could not scan in iter, %v", err)
 				return
 			}
 			if !yield(k, []byte(v)) {
@@ -100,9 +108,13 @@ func iterKV(db query, from string, to string, tbl string) iter.Seq2[string, []by
 	}
 }
 
-func iterKeys(db query, from string, to string, tbl string) iter.Seq[string] {
+func iterKeys(db query, from string, to string, tbl string, log *slog.Logger) iter.Seq[string] {
 	r, err := db.Query(fmt.Sprintf(`SELECT key FROM %s WHERE $1 <= key AND key <= $2`, tbl), from, to)
 	if err != nil {
+		if log != nil {
+			log.Error("[cove] could not query in iter,", "err", err)
+			return nil
+		}
 		_, _ = fmt.Fprintf(os.Stderr, "cove: could not query in iter, %v", err)
 		return nil
 	}
@@ -113,7 +125,13 @@ func iterKeys(db query, from string, to string, tbl string) iter.Seq[string] {
 			var k string
 			err := r.Scan(&k)
 			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "cove: could not scan in iter, %v", err)
+
+				if log != nil {
+					log.Error("[cove] iterKeys, could not scan in iter,", "err", err)
+					return
+				}
+
+				_, _ = fmt.Fprintf(os.Stderr, "cove: iterKeys, could not scan in iter, %v", err)
 				return
 			}
 			if !yield(k) {
@@ -123,10 +141,14 @@ func iterKeys(db query, from string, to string, tbl string) iter.Seq[string] {
 	}
 }
 
-func iterValues(db query, from string, to string, tbl string) iter.Seq[[]byte] {
+func iterValues(db query, from string, to string, tbl string, log *slog.Logger) iter.Seq[[]byte] {
 	r, err := db.Query(fmt.Sprintf(`SELECT value FROM %s WHERE $1 <= key AND key <= $2`, tbl), from, to)
 	if err != nil {
-		_, _ = fmt.Fprintf(os.Stderr, "cove: could not query in iter, %v", err)
+		if log != nil {
+			log.Error("[cove] iterValues, could not query in iter,", "err", err)
+			return nil
+		}
+		_, _ = fmt.Fprintf(os.Stderr, "cove: iterValues, could not query in iter, %v", err)
 		return nil
 	}
 
@@ -136,7 +158,11 @@ func iterValues(db query, from string, to string, tbl string) iter.Seq[[]byte] {
 			var v string
 			err := r.Scan(&v)
 			if err != nil {
-				_, _ = fmt.Fprintf(os.Stderr, "cove: could not scan in iter, %v", err)
+				if log != nil {
+					log.Error("[cove] iterValues, could not scan in iter,", "err", err)
+					return
+				}
+				_, _ = fmt.Fprintf(os.Stderr, "cove: iterValues, could not scan in iter, %v", err)
 				return
 			}
 			if !yield([]byte(v)) {
