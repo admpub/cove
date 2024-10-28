@@ -26,7 +26,7 @@ func exec(db query, qs ...string) error {
 	return nil
 }
 
-func getRange(db query, from string, to string, tbl string) (kv []KV, err error) {
+func getRange(db query, from string, to string, tbl string) (kv []KV[[]byte], err error) {
 	r, err := db.Query(fmt.Sprintf(`SELECT key, value FROM %s WHERE $1 <= key AND key <= $2`, tbl), from, to)
 	if err != nil {
 		return nil, fmt.Errorf("could not query in range, %w", err)
@@ -38,7 +38,7 @@ func getRange(db query, from string, to string, tbl string) (kv []KV, err error)
 		if err != nil {
 			return nil, fmt.Errorf("could not scan in range, %w", err)
 		}
-		kv = append(kv, KV{K: k, V: []byte(v)})
+		kv = append(kv, KV[[]byte]{K: k, V: []byte(v)})
 	}
 	return kv, nil
 }
@@ -156,7 +156,7 @@ func evictAll(r query, tbl string) (int, error) {
 	i, err := res.RowsAffected()
 	return int(i), err
 }
-func evict(r query, key string, tbl string) (KV, error) {
+func evict(r query, key string, tbl string) (KV[[]byte], error) {
 	var value []byte
 	err := r.QueryRow(fmt.Sprintf(`
 		DELETE FROM %s 
@@ -165,12 +165,12 @@ func evict(r query, key string, tbl string) (KV, error) {
 	`, tbl), key).Scan(&value)
 
 	if errors.Is(err, sql.ErrNoRows) {
-		return KV{}, NotFound
+		return KV[[]byte]{}, NotFound
 	}
 	if err != nil {
-		return KV{}, fmt.Errorf("could not delete key %s, err; %w", key, err)
+		return KV[[]byte]{}, fmt.Errorf("could not delete key %s, err; %w", key, err)
 	}
-	return KV{K: key, V: value}, err
+	return KV[[]byte]{K: key, V: value}, err
 }
 
 func get(r query, key string, tbl string) ([]byte, error) {
@@ -219,7 +219,7 @@ func setTTL(r query, key string, value []byte, ttl time.Duration, tbl string) er
 	return nil
 }
 
-func batchGet(db query, keys []string, tbl string) ([]KV, error) {
+func batchGet(db query, keys []string, tbl string) ([]KV[[]byte], error) {
 	var values []string
 	var params []any
 	for i, key := range keys {
@@ -238,7 +238,7 @@ func batchGet(db query, keys []string, tbl string) ([]KV, error) {
 		return nil, fmt.Errorf("could not query, %w", err)
 	}
 	defer rows.Close()
-	var kvs []KV
+	var kvs []KV[[]byte]
 	for rows.Next() {
 		var key string
 		var value string
@@ -246,12 +246,12 @@ func batchGet(db query, keys []string, tbl string) ([]KV, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not scan, %w", err)
 		}
-		kvs = append(kvs, KV{K: key, V: []byte(value)})
+		kvs = append(kvs, KV[[]byte]{K: key, V: []byte(value)})
 	}
 	return kvs, nil
 }
 
-func batchSet(db query, rows []KV, ttl time.Duration, tbl string) error {
+func batchSet(db query, rows []KV[[]byte], ttl time.Duration, tbl string) error {
 
 	var values []string
 	var params []any
@@ -277,7 +277,7 @@ func batchSet(db query, rows []KV, ttl time.Duration, tbl string) error {
 	return err
 }
 
-func batchEvict(r query, keys []string, tbl string) ([]KV, error) {
+func batchEvict(r query, keys []string, tbl string) ([]KV[[]byte], error) {
 	var values []string
 	var params []any
 	for i, key := range keys {
@@ -296,7 +296,7 @@ func batchEvict(r query, keys []string, tbl string) ([]KV, error) {
 		return nil, fmt.Errorf("could not query, %w", err)
 	}
 	defer rows.Close()
-	var kvs []KV
+	var kvs []KV[[]byte]
 	for rows.Next() {
 		var key string
 		var value string
@@ -304,7 +304,7 @@ func batchEvict(r query, keys []string, tbl string) ([]KV, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not scan, %w", err)
 		}
-		kvs = append(kvs, KV{K: key, V: []byte(value)})
+		kvs = append(kvs, KV[[]byte]{K: key, V: []byte(value)})
 	}
 
 	return kvs, nil
@@ -325,7 +325,7 @@ func vacuumNoResult(r query, max int, tbl string) (int, error) {
 	i, err := res.RowsAffected()
 	return int(i), err
 }
-func vacuum(r query, max int, tbl string) ([]KV, error) {
+func vacuum(r query, max int, tbl string) ([]KV[[]byte], error) {
 
 	q := fmt.Sprintf(`
 		DELETE FROM %s 
@@ -339,7 +339,7 @@ func vacuum(r query, max int, tbl string) ([]KV, error) {
 		return nil, fmt.Errorf("could not query, %w", err)
 	}
 	defer rows.Close()
-	var kvs []KV
+	var kvs []KV[[]byte]
 	for rows.Next() {
 		var key string
 		var value string
@@ -347,7 +347,7 @@ func vacuum(r query, max int, tbl string) ([]KV, error) {
 		if err != nil {
 			return nil, fmt.Errorf("could not scan, %w", err)
 		}
-		kvs = append(kvs, KV{K: key, V: []byte(value)})
+		kvs = append(kvs, KV[[]byte]{K: key, V: []byte(value)})
 	}
 	return kvs, nil
 }

@@ -51,19 +51,19 @@ func (t *TypedCache[V]) encode(v V) ([]byte, error) {
 }
 
 // Range returns all key value pairs in the range [from, to]
-func (t *TypedCache[V]) Range(from string, to string) ([]KVt[V], error) {
+func (t *TypedCache[V]) Range(from string, to string) ([]KV[V], error) {
 	kv, err := t.cache.Range(from, to)
 	if err != nil {
 		return nil, err
 	}
 
-	var kvs []KVt[V]
+	var kvs []KV[V]
 	for _, v := range kv {
 		value, err := t.decode(v.V)
 		if err != nil {
 			return nil, err
 		}
-		kvs = append(kvs, KVt[V]{K: v.K, V: value})
+		kvs = append(kvs, KV[V]{K: v.K, V: value})
 	}
 
 	return kvs, err
@@ -185,14 +185,14 @@ func (t *TypedCache[V]) GetOr(key string, getter func(key string) (V, error)) (V
 // the BatchSet will take place in one transaction, but split up into sub-batches of MAX_PARAMS/3 size, ie 999/3 = 333,
 // in order to have the BatchSet be atomic. If one key fails to set, the whole batch will fail.
 // Prefer batches less then MAX_PARAMS
-func (t *TypedCache[V]) BatchSet(ziped []KVt[V]) error {
-	var rows []KV
+func (t *TypedCache[V]) BatchSet(ziped []KV[V]) error {
+	var rows []KV[[]byte]
 	for _, z := range ziped {
 		b, err := t.encode(z.V)
 		if err != nil {
 			return err
 		}
-		rows = append(rows, KV{K: z.K, V: b})
+		rows = append(rows, KV[[]byte]{K: z.K, V: b})
 	}
 	return t.cache.BatchSet(rows)
 }
@@ -202,18 +202,18 @@ func (t *TypedCache[V]) BatchSet(ziped []KVt[V]) error {
 // the BatchGet will take place in one transaction, but split up into sub-batches of MAX_PARAMS size, ie 999,
 // in order to have the BatchGet be atomic. If one key fails to fetched, the whole batch will fail.
 // Prefer batches less then MAX_PARAMS
-func (t *TypedCache[V]) BatchGet(keys []string) ([]KVt[V], error) {
+func (t *TypedCache[V]) BatchGet(keys []string) ([]KV[V], error) {
 	kvs, err := t.cache.BatchGet(keys)
 	if err != nil {
 		return nil, err
 	}
-	var zipped []KVt[V]
+	var zipped []KV[V]
 	for _, v := range kvs {
 		value, err := t.decode(v.V)
 		if err != nil {
 			return nil, err
 		}
-		zipped = append(zipped, KVt[V]{K: v.K, V: value})
+		zipped = append(zipped, KV[V]{K: v.K, V: value})
 	}
 	return zipped, nil
 }
@@ -224,18 +224,18 @@ func (t *TypedCache[V]) BatchGet(keys []string) ([]KVt[V], error) {
 // the eviction will take place in one transaction, but split up into bacthes of MAX_PARAMS, ie 999,
 // in order to have the eviction be atomic. If one key fails to evict, the whole batch will fail.
 // Prefer batches less then MAX_PARAMS
-func (t *TypedCache[V]) BatchEvict(keys []string) ([]KVt[V], error) {
+func (t *TypedCache[V]) BatchEvict(keys []string) ([]KV[V], error) {
 	kvs, err := t.cache.BatchEvict(keys)
 	if err != nil {
 		return nil, err
 	}
-	var zipped []KVt[V]
+	var zipped []KV[V]
 	for _, v := range kvs {
 		value, err := t.decode(v.V)
 		if err != nil {
 			return nil, err
 		}
-		zipped = append(zipped, KVt[V]{K: v.K, V: value})
+		zipped = append(zipped, KV[V]{K: v.K, V: value})
 	}
 	return zipped, nil
 }
@@ -250,8 +250,8 @@ func (t *TypedCache[V]) EvictAll() (int, error) {
 // Evict evicts a key from the cache
 //
 // if onEvict is set, it will be called for key
-func (t *TypedCache[V]) Evict(key string) (KVt[V], error) {
-	var res KVt[V]
+func (t *TypedCache[V]) Evict(key string) (KV[V], error) {
+	var res KV[V]
 	kv, err := t.cache.Evict(key)
 
 	if errors.Is(err, NotFound) {

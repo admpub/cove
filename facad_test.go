@@ -169,7 +169,7 @@ func TestBatchSetTypedCacheValues(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []cove.KVt[string]{
+	ziped := []cove.KV[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 	}
@@ -188,7 +188,7 @@ func TestBatchGetTypedCacheValues(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []cove.KVt[string]{
+	ziped := []cove.KV[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 	}
@@ -218,11 +218,11 @@ func TestCacheBatchEvictTypedSizes(t *testing.T) {
 			typed := cove.Of[string](cc)
 
 			var keys []string
-			var rows []cove.KVt[string]
+			var rows []cove.KV[string]
 			for i := 0; i < itre; i++ {
 				k := strconv.Itoa(i)
 				v := fmt.Sprintf("value_%d", i)
-				rows = append(rows, cove.KVt[string]{K: k, V: v})
+				rows = append(rows, cove.KV[string]{K: k, V: v})
 				keys = append(keys, k)
 				err = typed.Set(k, v)
 				assert.NoError(t, err)
@@ -268,7 +268,7 @@ func TestTypedCacheItrRange(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []cove.KVt[string]{
+	ziped := []cove.KV[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 		{K: "key3", V: "value3"},
@@ -277,9 +277,9 @@ func TestTypedCacheItrRange(t *testing.T) {
 	err := typedCache.BatchSet(ziped)
 	assert.NoError(t, err)
 
-	var result []cove.KVt[string]
+	var result []cove.KV[string]
 	typedCache.ItrRange("key1", "key3")(func(k string, v string) bool {
-		result = append(result, cove.KVt[string]{K: k, V: v})
+		result = append(result, cove.KV[string]{K: k, V: v})
 		return true
 	})
 
@@ -294,7 +294,7 @@ func TestTypedCacheItrKeys(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []cove.KVt[string]{
+	ziped := []cove.KV[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 		{K: "key3", V: "value3"},
@@ -318,7 +318,7 @@ func TestTypedCacheItrValues(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []cove.KVt[string]{
+	ziped := []cove.KV[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 		{K: "key3", V: "value3"},
@@ -342,7 +342,7 @@ func TestTypedCacheValues(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []cove.KVt[string]{
+	ziped := []cove.KV[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 		{K: "key3", V: "value3"},
@@ -362,7 +362,7 @@ func TestTypedCacheKeys(t *testing.T) {
 	typedCache := TypedCache(t)
 	defer typedCache.Raw().Close()
 
-	ziped := []cove.KVt[string]{
+	ziped := []cove.KV[string]{
 		{K: "key1", V: "value1"},
 		{K: "key2", V: "value2"},
 		{K: "key3", V: "value3"},

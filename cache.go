@@ -384,7 +384,7 @@ func (c *Cache) tx(eval func(tx *sql.Tx) error) error {
 // the BatchSet will take place in one transaction, but split up into sub-batches of MAX_PARAMS/3 size, ie 999/3 = 333,
 // in order to have the BatchSet be atomic. If one key fails to set, the whole batch will fail.
 // Prefer batches less then MAX_PARAMS
-func (c *Cache) BatchSet(rows []KV) error {
+func (c *Cache) BatchSet(rows []KV[[]byte]) error {
 	size := MAX_PARAMS / 3
 
 	if len(rows) <= size {
@@ -418,7 +418,7 @@ func (c *Cache) BatchSet(rows []KV) error {
 // the BatchGet will take place in one transaction, but split up into sub-batches of MAX_PARAMS size, ie 999,
 // in order to have the BatchGet be atomic. If one key fails to fetched, the whole batch will fail.
 // Prefer batches less then MAX_PARAMS
-func (c *Cache) BatchGet(keys []string) ([]KV, error) {
+func (c *Cache) BatchGet(keys []string) ([]KV[[]byte], error) {
 
 	size := MAX_PARAMS
 
@@ -426,7 +426,7 @@ func (c *Cache) BatchGet(keys []string) ([]KV, error) {
 		return batchGet(c.db, keys, c.tbl())
 	}
 
-	var res []KV
+	var res []KV[[]byte]
 
 	err := c.tx(func(tx *sql.Tx) error {
 		for i := 0; i < len(keys); i += size {
@@ -456,7 +456,7 @@ func (c *Cache) BatchGet(keys []string) ([]KV, error) {
 // the eviction will take place in one transaction, but split up into bacthes of MAX_PARAMS, ie 999,
 // in order to have the eviction be atomic. If one key fails to evict, the whole batch will fail.
 // Prefer batches less then MAX_PARAMS
-func (c *Cache) BatchEvict(keys []string) (evicted []KV, err error) {
+func (c *Cache) BatchEvict(keys []string) (evicted []KV[[]byte], err error) {
 
 	defer func() {
 		if c.onEvict != nil {
@@ -495,7 +495,7 @@ func (c *Cache) BatchEvict(keys []string) (evicted []KV, err error) {
 
 // Evict evicts a key from the cache
 // if onEvict is set, it will be called for key
-func (c *Cache) Evict(key string) (kv KV, err error) {
+func (c *Cache) Evict(key string) (kv KV[[]byte], err error) {
 	kv, err = evict(c.db, key, c.tbl())
 	if err == nil && c.onEvict != nil {
 		go c.onEvict(kv.K, kv.V)
@@ -510,7 +510,7 @@ func (c *Cache) EvictAll() (len int, err error) {
 }
 
 // Range returns all key value pairs in the range [from, to]
-func (c *Cache) Range(from string, to string) (kv []KV, err error) {
+func (c *Cache) Range(from string, to string) (kv []KV[[]byte], err error) {
 	return getRange(c.db, from, to, c.tbl())
 }
 

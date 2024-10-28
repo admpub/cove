@@ -4,12 +4,12 @@
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/modfin/cove)](https://pkg.go.dev/github.com/modfin/cove)
 
 
-`cove` is a caching library for Go that utilizes SQLite as the storage backend. It provides a simple and efficient way to cache key-value pairs with support for TTL (Time-To-Live), namespaces, batch operations, range scans and eviction callbacks.
+`cove` is a caching library for Go that utilizes SQLite as the storage backend. It provides a TTL cache for key-value pairs with support for namespaces, batch operations, range scans and eviction callbacks.
 
 
 ## TL;DR
 
-Simple caching library for Go backed by SQLite
+A TTL caching for Go backed by SQLite. (See examples for usage)
 
 ```bash 
 go get github.com/modfin/cove
@@ -21,8 +21,6 @@ package main
 import (
 	"fmt"
 	"github.com/modfin/cove"
-	"strings"
-	"time"
 )
 
 func main() {
@@ -38,6 +36,7 @@ func main() {
 	if err != nil {
 		panic(err)
 	}
+	// When using generic, use a separate namespace for each type
 	stringCache := cove.Of[string](ns)
 
 	stringCache.Set("key", "the string")
@@ -51,6 +50,17 @@ func main() {
 		fmt.Println(str) // Output: the string
 	}
 
+	str, err = stringCache.GetOr("async-key", func(key string) (string, error) {
+		return "refreshed string", nil
+	})
+	found, err = cove.Hit(err)
+	if err != nil {
+		panic(err)
+	}
+	if found {
+		fmt.Println(str) // Output: refreshed string
+	}
+
 }
 
 ```
@@ -59,14 +69,23 @@ func main() {
 ## Use case
 cove is meant to be embedded into your application, and not as a standalone service. It is a simple key-value store that is meant to be used for caching data that is expensive to compute or retrieve. 
 
-cove can also be used as simple key-value store
+`cove` can also be used as a key-value store
 
-using SQLite as a storage backend comes with some benefits such as
-- Transactions and ACID
-- Key-Value pairs up to a size of 1GB each
-- Offloading to disk allowing for very larger caches
-- Easy to use and setup
-- No need for a separate service
+So why SQLite?
+
+There are plenty of in memory and other caches build in go, eg https://github.com/avelino/awesome-go#cache, performance, concurrency, fast, LFU, LRU, ARC and so on.
+There are also a few key-value stores build in go that can be embedded (just like cove), eg https://github.com/dgraph-io/badger or https://github.com/boltdb/bolt and probably quite a few more, https://github.com/avelino/awesome-go#databases-implemented-in-go.
+
+Well if these alternatives suits your use case, use them. 
+The main benefit of using a cache/kv, from my perspective and the reason for building cove, is that a cache backed by sqlite should be decent in most use case. 
+Its generically just a good solution while probably being outperformed in most niche cases.
+- you can have very large K/V pairs
+- you can tune it for your use case
+- it should perform decently
+- you can cache hundreds of GB. SSD are fast these days.
+- page caching and tuning will help you out.
+
+While sqlite has come a long way since its inception and particular with it running in WAL mode, there are some limitations. Eg only one writer is allowed at a time. So if you have a write heavy cache, you might want to consider another solution. With that said it should be fine for most some tuning can be done to increase write performance, eg `synchronous = off`.
 
 ## Installation
 
@@ -76,11 +95,47 @@ To install `cove`, use `go get`:
 go get github.com/modfin/cove
 ```
 
+### Considerations
+Since `cove` uses SQLite as the storage backend, it is important realize that you project now will depend on cgo and that the SQLite library will be compiled into your project. This might not be a problem at all, but it could cause problems in some modern "magic" build tools used in CD/CI pipelines for go.
+
 ## Usage
+
+### Tuning 
+
+cove uses sqlite in WAL mode and writes the data to disk. While probably :memory: works for the most part, it does not have all the cool performance stuff that comes with sqlite in WAL mode on disk and probably will result in som SQL_BUSY errors.
+
+In general the default tuning is the following
+```sqlite
+PRAGMA journal_mode = WAL;
+PRAGMA synchronous = normal;
+PRAGMA temp_store = memory;
+PRAGMA auto_vacuum = incremental;
+PRAGMA incremental_vacuum;
+```
+
+Have a look at https://www.sqlite.org/pragma.html for tuning your cache to your needs.
+
+If you are write heavy, you might want to consider `synchronous = off` and dabble with some other settings, eg `wal_autocheckpoint`, to increase write performance. The tradeoff is that you might lose some read performance instead.
+
+```go
+    cache, err := cove.New(cove.URITemp(), cove.DBSyncOff(), cove.DBPragma("wal_autocheckpoint = 1000"))
+```
+
 
 ### Creating a Cache
 
 To create a cache, use the `New` function. You can specify various options such as TTL, vacuum interval, and eviction callbacks.
+
+
+#### Config
+
+`cove.URITemp()` Creates a temporary directory in `/tmp` or similar for the database. If combined with a `cove.DBRemoveOnClose()` and a gracefull shutdown, the database will be removed on close
+
+if you want the cache to persist over restarts or such, you can use `cove.URIFromPath("/path/to/db/cache.db")` instead.
+
+There are a few options that can be set when creating a cache, see `cove.With*` and `cove.DB*` functions for more information.
+
+#### Example
 
 ```go
 package main
@@ -135,13 +190,71 @@ func main() {
 
     // Get the value
     value, err := cache.Get("key")
+	hit, err := cove.Hit(err)
     if err != nil {
         panic(err)
     }
 
-    fmt.Println(string(value)) // Output: value0
+    fmt.Println("[Hit]:", hit, "[Value]:", string(value)) // Output: "[Hit]: true [Value]: value0
 }
 ```
+
+
+
+### Handling `NotFound` errors
+
+If a key is not found in the cache, the `Get` method will return an `NotFound` error.
+
+You can handle not found errors using the `Hit` and `Miss` helper functions.
+
+```go
+package main
+
+import (
+    "errors"
+    "fmt"
+    "github.com/modfin/cove"
+    "time"
+)
+
+func main() {
+    cache, err := cove.New(
+        cove.URITemp(),
+        cove.DBRemoveOnClose(),
+        cove.WithTTL(time.Minute*10),
+    )
+    if err != nil {
+        panic(err)
+    }
+    defer cache.Close()
+
+    _, err = cache.Get("key")
+    fmt.Println("err == cove.NotFound:", err == cove.NotFound)
+    fmt.Println("errors.Is(err, cove.NotFound):", errors.Is(err, cove.NotFound))
+
+    _, err = cache.Get("key")
+    hit, err := cove.Hit(err)
+    if err != nil { // A "real" error has occurred
+        panic(err)
+    }
+    if !hit {
+        fmt.Println("key miss")
+    }
+
+    _, err = cache.Get("key")
+    miss, err := cove.Miss(err)
+    if err != nil { // A "real" error has occurred
+        panic(err)
+    }
+    if miss {
+        fmt.Println("key miss")
+    }
+}
+```
+
+
+
+
 
 ### Using Namespaces
 
@@ -183,12 +296,22 @@ func main() {
         panic(err)
     }
 
-    value, err := ns.Get("key")
+
+
+
+	value, err := cache.Get("key")
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(value)) // Output: value0
+	
+    value, err = ns.Get("key")
     if err != nil {
         panic(err)
     }
-
     fmt.Println(string(value)) // Output: value1
+	
+	
 }
 ```
 
@@ -283,56 +406,135 @@ func main() {
 }
 ```
 
-### Handling `NotFound` errors
 
-If a key is not found in the cache, the `Get` method will return an `NotFound` error.
+### Batch Operations
 
-You can handle not found errors using the `Hit` and `Miss` helper functions.
+`cove` provides batch operations to efficiently handle multiple keys in a single operation. This includes `BatchSet`, `BatchGet`, and `BatchEvict`.
+
+#### BatchSet
+
+The `BatchSet` method allows you to set multiple key-value pairs in the cache in a single operation. This method ensures atomicity by splitting the batch into sub-batches if necessary.
 
 ```go
 package main
 
 import (
-    "errors"
     "fmt"
     "github.com/modfin/cove"
-    "time"
 )
+
+func assertNoErr(err error) {
+    if err != nil {
+        panic(err)
+    }
+}
 
 func main() {
     cache, err := cove.New(
         cove.URITemp(),
         cove.DBRemoveOnClose(),
-        cove.WithTTL(time.Minute*10),
     )
-    if err != nil {
-        panic(err)
-    }
+    assertNoErr(err)
     defer cache.Close()
 
-    _, err = cache.Get("key")
-    fmt.Println("err == cove.NotFound:", err == cove.NotFound)
-    fmt.Println("errors.Is(err, cove.NotFound):", errors.Is(err, cove.NotFound))
+    err = cache.BatchSet([]cove.KV[[]byte]{
+        {K: "key1", V: []byte("val1")},
+        {K: "key2", V: []byte("val2")},
+    })
+    assertNoErr(err)
+}
+```
 
-    _, err = cache.Get("key")
-    hit, err := cove.Hit(err)
+#### BatchGet
+
+The `BatchGet` method allows you to retrieve multiple keys from the cache in a single operation. This method ensures atomicity by splitting the batch into sub-batches if necessary.
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/modfin/cove"
+)
+
+func assertNoErr(err error) {
     if err != nil {
         panic(err)
     }
-    if !hit {
-        fmt.Println("key miss")
-    }
+}
 
-    _, err = cache.Get("key")
-    miss, err := cove.Miss(err)
-    if err != nil {
-        panic(err)
-    }
-    if miss {
-        fmt.Println("key miss")
+func main() {
+    cache, err := cove.New(
+        cove.URITemp(),
+        cove.DBRemoveOnClose(),
+    )
+    assertNoErr(err)
+    defer cache.Close()
+
+    err = cache.BatchSet([]cove.KV[[]byte]{
+        {K: "key1", V: []byte("val1")},
+        {K: "key2", V: []byte("val2")},
+    })
+    assertNoErr(err)
+
+    kvs, err := cache.BatchGet([]string{"key1", "key2", "key3"})
+    assertNoErr(err)
+
+    for _, kv := range kvs {
+        fmt.Println(kv.K, "-", string(kv.V))
+        // Output:
+        // key1 - val1
+        // key2 - val2
     }
 }
 ```
+
+#### BatchEvict
+
+The `BatchEvict` method allows you to evict multiple keys from the cache in a single operation. This method ensures atomicity by splitting the batch into sub-batches if necessary.
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/modfin/cove"
+)
+
+func assertNoErr(err error) {
+    if err != nil {
+        panic(err)
+    }
+}
+
+func main() {
+    cache, err := cove.New(
+        cove.URITemp(),
+        cove.DBRemoveOnClose(),
+    )
+    assertNoErr(err)
+    defer cache.Close()
+
+    err = cache.BatchSet([]cove.KV[[]byte]{
+        {K: "key1", V: []byte("val1")},
+        {K: "key2", V: []byte("val2")},
+    })
+    assertNoErr(err)
+
+    evicted, err := cache.BatchEvict([]string{"key1", "key2", "key3"})
+    assertNoErr(err)
+
+    for _, kv := range evicted {
+        fmt.Println("Evicted,", kv.K, "-", string(kv.V))
+        // Output:
+        // Evicted, key1 - val1
+        // Evicted, key2 - val2
+    }
+}
+```
+
+These batch operations help in efficiently managing multiple keys in the cache, ensuring atomicity and reducing the number of individual operations.
+
 
 
 ### Typed Cache
@@ -340,6 +542,10 @@ func main() {
 The `TypedCache` in `cove` provides a way to work with strongly-typed values in the cache, using Go generics. This allows you to avoid manual serialization and deserialization of values, making the code cleaner and less error-prone.
 
 #### Creating a Typed Cache
+
+A Typed Cache is simply to use golang generics to wrap the cache and provide type safety and ease of use.
+The Typed Cache comes with the same fetchers and api as the untyped cache but adds a marshalling and unmarshalling layer on top of it. 
+encoding/gob is used for serialization and deserialization of values.
 
 To create a typed cache, use the `Of` function, passing the existing cache/namespace instance:
 
@@ -368,7 +574,6 @@ func main() {
 	cache, err := cove.New(
 		cove.URITemp(),
 		cove.DBRemoveOnClose(),
-		cove.WithTTL(time.Minute*10),
 	)
 	assertNoErr(err)
 	defer cache.Close()
