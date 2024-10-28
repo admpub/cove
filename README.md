@@ -42,22 +42,22 @@ func main() {
 	stringCache.Set("key", "the string")
 
 	str, err := stringCache.Get("key")
-	found, err := cove.Hit(err)
+	hit, err := cove.Hit(err)
 	if err != nil {
 		panic(err)
 	}
-	if found {
+	if hit {
 		fmt.Println(str) // Output: the string
 	}
 
 	str, err = stringCache.GetOr("async-key", func(key string) (string, error) {
 		return "refreshed string", nil
 	})
-	found, err = cove.Hit(err)
+	hit, err = cove.Hit(err)
 	if err != nil {
 		panic(err)
 	}
-	if found {
+	if hit {
 		fmt.Println(str) // Output: refreshed string
 	}
 
