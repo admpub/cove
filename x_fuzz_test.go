@@ -47,7 +47,7 @@ func FuzzGetSet(f *testing.F) {
 		assert.Equal(t, key, kv.K)
 		assert.Equal(t, val, kv.V)
 
-		v, err = cache.Get(key)
+		_, err = cache.Get(key)
 		assert.Error(t, err)
 		assert.Equal(t, err, cove.NotFound)
 	})
