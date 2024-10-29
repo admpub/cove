@@ -32,8 +32,6 @@ func FuzzGetSet(f *testing.F) {
 	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(f, err)
 
-	fmt.Println("cache:", cache)
-
 	f.Fuzz(func(t *testing.T, key string, val []byte) {
 		fmt.Println("fuzz k:", key, "v:", string(val))
 

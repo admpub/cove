@@ -3,7 +3,6 @@ package cove_test
 import (
 	"fmt"
 	"github.com/modfin/cove"
-	"log/slog"
 	"sort"
 	"strconv"
 	"testing"
@@ -12,12 +11,8 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func init() {
-	//slog.SetLogLoggerLevel(slog.LevelDebug)
-}
-
 func TypedCache(t *testing.T) *cove.TypedCache[string] {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	assert.NotNil(t, cache)
 	return cove.Of[string](cache)
@@ -32,7 +27,7 @@ type Complex struct {
 }
 
 func TypedComplexCache(t *testing.T) *cove.TypedCache[Complex] {
-	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
 	assert.NotNil(t, cache)
 	return cove.Of[Complex](cache)
@@ -216,7 +211,7 @@ func TestCacheBatchEvictTypedSizes(t *testing.T) {
 
 	do := func(itre int) func(t *testing.T) {
 		return func(t *testing.T) {
-			cc, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose(), cove.WithLogger(slog.Default()))
+			cc, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 			assert.NoError(t, err)
 			defer cc.Close()
 

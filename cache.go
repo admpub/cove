@@ -261,7 +261,7 @@ func schema(c *Cache) error {
 	return exec(c.db, q)
 }
 
-// Close closes the cache
+// Close closes the cache and all its namespaces
 func (c *Cache) Close() error {
 	defer func() {
 		if *c.removeOnClose {
