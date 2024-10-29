@@ -3,14 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/modfin/cove"
+	"github.com/modfin/cove/examples/helper"
 	"time"
 )
-
-func assertNoErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 // WARNING
 // Since iterators don't really have any way of communication errors
@@ -26,13 +21,13 @@ func main() {
 		cove.DBRemoveOnClose(),
 		cove.WithTTL(time.Minute*10),
 	)
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 	defer cache.Close()
 
 	// set a key value pairs in the cache
 	for i := 0; i < 100; i++ {
 		err = cache.Set(fmt.Sprintf("key%d", i), []byte(fmt.Sprintf("value%d", i)))
-		assertNoErr(err)
+		helper.AssertNoErr(err)
 	}
 
 	// KV iterator

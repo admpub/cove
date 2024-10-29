@@ -3,14 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/modfin/cove"
+	"github.com/modfin/cove/examples/helper"
 	"time"
 )
-
-func assertNoErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 type Person struct {
 	Name string
@@ -26,25 +21,25 @@ func main() {
 		cove.DBRemoveOnClose(),
 		cove.WithTTL(time.Minute*10),
 	)
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 	defer cache.Close()
 
 	typed := cove.Of[Person](cache)
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	// set a key value pair in the cache
 	err = typed.Set("alice", Person{Name: "Alice", Age: 30})
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	err = typed.Set("bob", Person{Name: "Bob", Age: 40})
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	err = typed.Set("charlie", Person{Name: "Bob", Age: 40})
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	// get the value from the cache
 	alice, err := typed.Get("alice")
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	fmt.Printf("%+v\n", alice)
 	// {Name:Alice Age:30}

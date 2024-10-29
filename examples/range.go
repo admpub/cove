@@ -3,14 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/modfin/cove"
+	"github.com/modfin/cove/examples/helper"
 	"time"
 )
-
-func assertNoErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 func main() {
 
@@ -22,18 +17,18 @@ func main() {
 		cove.DBRemoveOnClose(),
 		cove.WithTTL(time.Minute*10),
 	)
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 	defer cache.Close()
 
 	// set a key value pairs in the cache
 	for i := 0; i < 100; i++ {
 		err = cache.Set(fmt.Sprintf("key%d", i), []byte(fmt.Sprintf("value%d", i)))
-		assertNoErr(err)
+		helper.AssertNoErr(err)
 	}
 
 	// Tuple range
 	kvs, err := cache.Range("key97", cove.RANGE_MAX)
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	for _, kv := range kvs {
 		fmt.Println(kv.K, string(kv.V))
@@ -44,7 +39,7 @@ func main() {
 
 	// Key range
 	keys, err := cache.Keys(cove.RANGE_MIN, "key1")
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	for _, key := range keys {
 		fmt.Println(key)
@@ -54,7 +49,7 @@ func main() {
 
 	// Value range
 	values, err := cache.Values(cove.RANGE_MIN, "key1")
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	for _, value := range values {
 		fmt.Println(string(value))

@@ -3,13 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/modfin/cove"
+	"github.com/modfin/cove/examples/helper"
 )
-
-func assertNoErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 func main() {
 
@@ -24,11 +19,11 @@ func main() {
 				// Maybe do som stuff, proactively refresh the cache
 			}),
 	)
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 	cache.Close()
 
 	_ = cache.Set("key", []byte("evict me"))
-	_, _, _ = cache.Evict("key")
+	_, _ = cache.Evict("key")
 	// evicted key: evict me
 	cache.Close()
 }

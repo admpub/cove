@@ -3,14 +3,9 @@ package main
 import (
 	"fmt"
 	"github.com/modfin/cove"
+	"github.com/modfin/cove/examples/helper"
 	"time"
 )
-
-func assertNoErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 func main() {
 
@@ -22,16 +17,16 @@ func main() {
 		cove.DBRemoveOnClose(),
 		cove.WithTTL(time.Minute*10),
 	)
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 	defer cache.Close()
 
 	// set a key value pair in the cache
 	err = cache.Set("key", []byte("value0"))
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	// get the value from the cache
 	value, err := cache.Get("key")
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	fmt.Println(string(value))
 	// value0

@@ -3,15 +3,10 @@ package main
 import (
 	"fmt"
 	"github.com/modfin/cove"
+	"github.com/modfin/cove/examples/helper"
 	"sync"
 	"time"
 )
-
-func assertNoErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 func main() {
 
@@ -23,7 +18,7 @@ func main() {
 		cove.DBRemoveOnClose(),
 		cove.WithTTL(time.Minute*10),
 	)
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 	defer cache.Close()
 
 	fetch := func(key string) ([]byte, error) {
@@ -46,7 +41,7 @@ func main() {
 		wg.Add(1)
 		go func() {
 			val, err := cache.GetOr("MyKey", fetch)
-			assertNoErr(err)
+			helper.AssertNoErr(err)
 			fmt.Println(string(val))
 			wg.Done()
 		}()
@@ -64,21 +59,21 @@ func main() {
 
 	// Separate namespace can of course lock on the same key without interfering with each other
 	cache2, err := cache.NS("cache2")
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	wg = sync.WaitGroup{}
 	for i := 0; i < 10; i++ {
 		wg.Add(2)
 		go func() {
 			val, err := cache.GetOr("MyOtherKey", fetch)
-			assertNoErr(err)
+			helper.AssertNoErr(err)
 			fmt.Println("[cache1]", string(val))
 			wg.Done()
 		}()
 
 		go func() {
 			val, err := cache2.GetOr("MyOtherKey", fetch)
-			assertNoErr(err)
+			helper.AssertNoErr(err)
 			fmt.Println("[cache2]", string(val))
 			wg.Done()
 		}()

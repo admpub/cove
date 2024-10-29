@@ -2,15 +2,10 @@ package main
 
 import (
 	"github.com/modfin/cove"
+	"github.com/modfin/cove/examples/helper"
 	"log/slog"
 	"time"
 )
-
-func assertNoErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 func main() {
 
@@ -36,20 +31,20 @@ func main() {
 			slog.Default().Info("evicting", "key", key)
 		}),
 	)
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 	defer cache.Close()
 
 	// set a key value pair in the cache
 	err = cache.Set("key", []byte("value0"))
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	// set a key value pair in the cache
 	err = cache.Set("key1", []byte("value0"))
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	// set a key value pair in the cache
 	err = cache.Set("key2", []byte("value0"))
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	time.Sleep(time.Second)
 	//2024/10/24 17:05:16 INFO [cove] vacuumed ns=default time=736.684µs n=3

@@ -3,13 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/modfin/cove"
+	"github.com/modfin/cove/examples/helper"
 )
-
-func assertNoErr(err error) {
-	if err != nil {
-		panic(err)
-	}
-}
 
 func main() {
 
@@ -23,7 +18,7 @@ func main() {
 			fmt.Println("Callback, key", key, "was evicted")
 		}),
 	)
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 	defer cache.Close()
 
 	// Helper functions to construct []KV[[]byte] slice
@@ -32,10 +27,10 @@ func main() {
 		[][]byte{[]byte("val1"), []byte("val2")})
 
 	err = cache.BatchSet(KeyValueSet)
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	kvs, err := cache.BatchGet([]string{"key1", "key2", "key3"})
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 
 	for _, kv := range kvs {
 		fmt.Println(kv.Unzip())
@@ -45,7 +40,7 @@ func main() {
 	}
 
 	evicted, err := cache.BatchEvict([]string{"key1", "key2", "key3"})
-	assertNoErr(err)
+	helper.AssertNoErr(err)
 	// output:
 	//  Callback, key key1 was evicted
 	//  Callback, key key2 was evicted
