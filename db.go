@@ -84,9 +84,10 @@ func iterKV(db query, from string, to string, tbl string, log *slog.Logger) iter
 	if err != nil {
 		if log != nil {
 			log.Error("[cove] iterKV, could not query in iter", "err", err)
-			return nil
+			return func(yield func(string, []byte) bool) {}
 		}
 		_, _ = fmt.Fprintf(os.Stderr, "[cove] iterKV, could not query in iter, %v", err)
+		return func(yield func(string, []byte) bool) {}
 	}
 
 	return func(yield func(string, []byte) bool) {
@@ -115,10 +116,10 @@ func iterKeys(db query, from string, to string, tbl string, log *slog.Logger) it
 	if err != nil {
 		if log != nil {
 			log.Error("[cove] could not query in iter,", "err", err)
-			return nil
+			return func(yield func(string) bool) {}
 		}
 		_, _ = fmt.Fprintf(os.Stderr, "cove: could not query in iter, %v", err)
-		return nil
+		return func(yield func(string) bool) {}
 	}
 
 	return func(yield func(string) bool) {
@@ -148,10 +149,10 @@ func iterValues(db query, from string, to string, tbl string, log *slog.Logger) 
 	if err != nil {
 		if log != nil {
 			log.Error("[cove] iterValues, could not query in iter,", "err", err)
-			return nil
+			return func(yield func([]byte) bool) {}
 		}
 		_, _ = fmt.Fprintf(os.Stderr, "cove: iterValues, could not query in iter, %v", err)
-		return nil
+		return func(yield func([]byte) bool) {}
 	}
 
 	return func(yield func([]byte) bool) {

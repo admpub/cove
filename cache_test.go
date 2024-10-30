@@ -241,6 +241,17 @@ func TestCache_Range(t *testing.T) {
 	assert.Equal(t, "value3", string(kv[2].V))
 }
 
+func TestCache_RangeEmpty(t *testing.T) {
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	assert.NoError(t, err)
+	defer cache.Close()
+
+	// Test ItrRange
+	kv, err := cache.Range(cove.RANGE_MIN, cove.RANGE_MAX)
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(kv))
+}
+
 func TestCache_Keys(t *testing.T) {
 	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
 	assert.NoError(t, err)
@@ -368,6 +379,37 @@ func TestCacheIter(t *testing.T) {
 		vals = append(vals, string(val))
 	}
 	assert.Equal(t, []string{"value2", "value3", "value4"}, vals)
+
+}
+
+func TestCacheIterEmpty(t *testing.T) {
+	cache, err := cove.New(cove.URITemp(), cove.DBRemoveOnClose())
+	assert.NoError(t, err)
+	defer cache.Close()
+
+	// Set some key-value pairs in the cache
+
+	var res []cove.KV[[]byte]
+	for k, v := range cache.ItrRange("key2", "key4") {
+		res = append(res, cove.KV[[]byte]{
+			K: k,
+			V: v,
+		})
+	}
+
+	assert.Equal(t, len(res), 0)
+
+	var keys []string
+	for key := range cache.ItrKeys("key2", "key5") {
+		keys = append(keys, key)
+	}
+	assert.Equal(t, len(keys), 0)
+
+	var vals []string
+	for val := range cache.ItrValues("key2", "key5") {
+		vals = append(vals, string(val))
+	}
+	assert.Equal(t, len(vals), 0)
 
 }
 

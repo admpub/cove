@@ -24,6 +24,7 @@ func dbPragma(pragma string) Op {
 	}
 }
 
+// WithLogger sets the logger for the cache
 func WithLogger(log *slog.Logger) Op {
 	return func(c *Cache) error {
 		if log == nil {
@@ -149,7 +150,7 @@ func New(uri string, op ...Op) (*Cache, error) {
 		mu:         &sync.Mutex{},
 		muKey:      keyedMu(),
 		db:         db,
-		log:        slog.New(discardLogger{}).With("uri", uri),
+		log:        slog.New(discardLogger{}),
 
 		closeOnce:     &sync.Once{},
 		closed:        make(chan struct{}),
