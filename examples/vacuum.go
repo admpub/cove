@@ -1,10 +1,11 @@
 package main
 
 import (
-	"github.com/modfin/cove"
-	"github.com/modfin/cove/examples/helper"
 	"log/slog"
 	"time"
+
+	"github.com/admpub/cove"
+	"github.com/admpub/cove/examples/helper"
 )
 
 func main() {

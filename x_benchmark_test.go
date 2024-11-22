@@ -1,14 +1,15 @@
 package cove_test
 
 import (
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/modfin/cove"
-	"github.com/stretchr/testify/assert"
 	"math/rand/v2"
 	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/admpub/cove"
+	_ "github.com/admpub/cove/driver"
+	"github.com/stretchr/testify/assert"
 )
 
 func BenchmarkSetParallel(b *testing.B) {

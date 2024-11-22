@@ -1,7 +1,7 @@
 # Cove
 
-[![goreportcard.com](https://goreportcard.com/badge/github.com/modfin/cove)](https://goreportcard.com/report/github.com/modfin/cove)
-[![PkgGoDev](https://pkg.go.dev/badge/github.com/modfin/cove)](https://pkg.go.dev/github.com/modfin/cove)
+[![goreportcard.com](https://goreportcard.com/badge/github.com/admpub/cove)](https://goreportcard.com/report/github.com/admpub/cove)
+[![PkgGoDev](https://pkg.go.dev/badge/github.com/admpub/cove)](https://pkg.go.dev/github.com/admpub/cove)
 
 
 `cove` is a caching library for Go that utilizes SQLite as the storage backend. It provides a TTL cache for key-value pairs with support for namespaces, batch operations, range scans and eviction callbacks.
@@ -12,7 +12,7 @@
 A TTL caching for Go backed by SQLite. (See examples for usage)
 
 ```bash 
-go get github.com/modfin/cove
+go get github.com/admpub/cove
 ```
 
 ```go
@@ -20,7 +20,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/modfin/cove"
+	"github.com/admpub/cove"
 )
 
 func main() {
@@ -98,7 +98,7 @@ With that said it should be fine for most with some tuning to increase write per
 To install `cove`, use `go get`:
 
 ```sh
-go get github.com/modfin/cove
+go get github.com/admpub/cove
 ```
 
 ### Considerations
@@ -154,7 +154,7 @@ There are a few options that can be set when creating a cache, see `cove.With*` 
 package main
 
 import (
-    "github.com/modfin/cove"
+    "github.com/admpub/cove"
     "time"
 )
 
@@ -180,7 +180,7 @@ package main
 
 import (
     "fmt"
-    "github.com/modfin/cove"
+    "github.com/admpub/cove"
     "time"
 )
 
@@ -227,7 +227,7 @@ package main
 import (
     "errors"
     "fmt"
-    "github.com/modfin/cove"
+    "github.com/admpub/cove"
     "time"
 )
 
@@ -278,7 +278,7 @@ Namespaces allow you to isolate different sets of keys within the same cache.
 package main
 
 import (
-    "github.com/modfin/cove"
+    "github.com/admpub/cove"
     "time"
 	"fmt"
 )
@@ -338,7 +338,7 @@ package main
 
 import (
     "fmt"
-    "github.com/modfin/cove"
+    "github.com/admpub/cove"
 )
 
 func main() {
@@ -381,7 +381,7 @@ package main
 
 import (
     "fmt"
-    "github.com/modfin/cove"
+    "github.com/admpub/cove"
     "time"
 )
 
@@ -434,7 +434,7 @@ package main
 
 import (
     "fmt"
-    "github.com/modfin/cove"
+    "github.com/admpub/cove"
 )
 
 func assertNoErr(err error) {
@@ -468,7 +468,7 @@ package main
 
 import (
     "fmt"
-    "github.com/modfin/cove"
+    "github.com/admpub/cove"
 )
 
 func assertNoErr(err error) {
@@ -512,7 +512,7 @@ package main
 
 import (
     "fmt"
-    "github.com/modfin/cove"
+    "github.com/admpub/cove"
 )
 
 func assertNoErr(err error) {
@@ -568,7 +568,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/modfin/cove"
+	"github.com/admpub/cove"
 	"time"
 )
 

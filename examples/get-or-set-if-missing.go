@@ -2,10 +2,11 @@ package main
 
 import (
 	"fmt"
-	"github.com/modfin/cove"
-	"github.com/modfin/cove/examples/helper"
 	"sync"
 	"time"
+
+	"github.com/admpub/cove"
+	"github.com/admpub/cove/examples/helper"
 )
 
 func main() {

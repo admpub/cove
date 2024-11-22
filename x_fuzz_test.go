@@ -2,9 +2,11 @@ package cove_test
 
 import (
 	"fmt"
-	"github.com/modfin/cove"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/admpub/cove"
+	_ "github.com/admpub/cove/driver"
+	"github.com/stretchr/testify/assert"
 )
 
 // Since we are stepping on eachother with keys, use parallel=1

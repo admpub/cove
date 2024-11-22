@@ -2,14 +2,15 @@ package cove_test
 
 import (
 	"fmt"
-	"github.com/modfin/cove"
 	"sort"
 	"strconv"
 	"sync"
 	"testing"
 	"time"
 
-	_ "github.com/mattn/go-sqlite3"
+	"github.com/admpub/cove"
+	_ "github.com/admpub/cove/driver"
+
 	"github.com/stretchr/testify/assert"
 )
 

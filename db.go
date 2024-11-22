@@ -199,6 +199,9 @@ func evict(r query, key string, tbl string) (KV[[]byte], error) {
 	if err != nil {
 		return KV[[]byte]{}, fmt.Errorf("could not delete key %s, err; %w", key, err)
 	}
+	if value == nil {
+		value = []byte{}
+	}
 	return KV[[]byte]{K: key, V: value}, err
 }
 
@@ -215,6 +218,9 @@ func get(r query, key string, tbl string) ([]byte, error) {
 	}
 	if err != nil {
 		return nil, fmt.Errorf("could not get key %s, err; %w", key, err)
+	}
+	if value == nil {
+		value = []byte{}
 	}
 	return value, nil
 }

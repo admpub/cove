@@ -2,11 +2,13 @@ package cove_test
 
 import (
 	"fmt"
-	"github.com/modfin/cove"
 	"sort"
 	"strconv"
 	"testing"
 	"time"
+
+	"github.com/admpub/cove"
+	_ "github.com/admpub/cove/driver"
 
 	"github.com/stretchr/testify/assert"
 )
